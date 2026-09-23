@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="430" viewBox="0 0 900 430" role="img" aria-labelledby="title desc">
+  <title id="title">Top-three feature priorities</title>
+  <desc id="desc">Horizontal bar chart of survey respondents selecting features among their top three: appointment booking 12, appointment reminders 9, medication reminders 8, multilingual support 3, messaging care team 3, and other features 1 each.</desc>
+  <style>text { font-family: Arial, sans-serif; fill: #17324d; } .label { font-size: 20px; } .value { font-size: 18px; font-weight: 700; } .axis { font-size: 15px; fill: #5e7184; }</style>
+  <rect width="900" height="430" fill="#f8fbfd"/>
+  <text x="50" y="45" font-size="27" font-weight="700">Features selected among respondents’ top three</text>
+  <text x="50" y="72" class="axis">13 caregiver/supporter responses; each respondent selected up to three features</text>
+  <g stroke="#d5e0e8" stroke-width="1">
+    <line x1="380" y1="100" x2="380" y2="385"/><line x1="460" y1="100" x2="460" y2="385"/><line x1="540" y1="100" x2="540" y2="385"/><line x1="620" y1="100" x2="620" y2="385"/><line x1="700" y1="100" x2="700" y2="385"/><line x1="780" y1="100" x2="780" y2="385"/>
+  </g>
+  <g class="axis"><text x="376" y="405">0</text><text x="456" y="405">2</text><text x="536" y="405">4</text><text x="616" y="405">6</text><text x="696" y="405">8</text><text x="772" y="405">10</text><text x="850" y="405">12</text></g>
+  <g class="label"><text x="50" y="128">Doctor appointment booking</text><text x="50" y="173">Appointment reminders</text><text x="50" y="218">Medication reminders</text><text x="50" y="263">Multilingual voice support</text><text x="50" y="308">Messaging care team</text><text x="50" y="353">Ride / emergency / handoff / check-ins</text></g>
+  <g fill="#2d7f9d"><rect x="380" y="106" width="480" height="28" rx="4"/><rect x="380" y="151" width="360" height="28" rx="4"/><rect x="380" y="196" width="320" height="28" rx="4"/></g>
+  <g fill="#78a9bd"><rect x="380" y="241" width="120" height="28" rx="4"/><rect x="380" y="286" width="120" height="28" rx="4"/><rect x="380" y="331" width="40" height="28" rx="4"/></g>
+  <g class="value"><text x="870" y="128">12</text><text x="750" y="173">9</text><text x="710" y="218">8</text><text x="510" y="263">3</text><text x="510" y="308">3</text><text x="430" y="353">1 each</text></g>
+</svg>
