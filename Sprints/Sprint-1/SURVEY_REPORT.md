@@ -5,6 +5,15 @@
 **Survey period:** Week 3  
 **Responses analyzed:** 13
 
+## Team 4
+
+| Team member | GitHub username / alias |
+| --- | --- |
+| Moebius Yang | |
+| Zohreh Ashtarilarki | ZohrehAshtarilarki |
+| Amarjargal Ayurzana | Akiko0210 |
+| Kunj Shah | kunjcr2 |
+
 ---
 
 ## Executive Summary
