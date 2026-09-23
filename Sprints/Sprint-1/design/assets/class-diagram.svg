@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="940" viewBox="0 0 1400 940" role="img" aria-labelledby="title desc">
+  <title id="title">CS160 Project draft class diagram</title>
+  <desc id="desc">Provisional domain classes include User, ConversationSession, Appointment, AppointmentOption, ConfirmationRequest, Reminder, AppointmentService, ProviderAdapter, and MockProviderAdapter.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#475569"/></marker>
+    <style>text{font-family:Arial,sans-serif;fill:#172033}.pageTitle{font-size:30px;font-weight:700}.classTitle{font-size:18px;font-weight:700}.member{font-size:14px}.relation{font-size:13px;fill:#475569}.edge{stroke:#475569;stroke-width:2;fill:none;marker-end:url(#arrow)}.dash{stroke-dasharray:7 5}</style>
+  </defs>
+  <rect width="1400" height="940" fill="#ffffff"/>
+  <text x="45" y="48" class="pageTitle">Class Diagram — Provisional Domain Model</text>
+
+  <g>
+    <rect x="60" y="105" width="260" height="170" rx="8" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+    <line x1="60" y1="145" x2="320" y2="145" stroke="#0284c7"/><text x="190" y="132" class="classTitle" text-anchor="middle">User</text>
+    <text x="78" y="170" class="member">+ id: UUID</text><text x="78" y="194" class="member">+ displayName: string</text><text x="78" y="218" class="member">+ preferredLanguage: string</text><text x="78" y="242" class="member">+ timezone: string</text>
+
+    <rect x="400" y="105" width="280" height="190" rx="8" fill="#ccfbf1" stroke="#0f766e" stroke-width="2"/>
+    <line x1="400" y1="145" x2="680" y2="145" stroke="#0f766e"/><text x="540" y="132" class="classTitle" text-anchor="middle">ConversationSession</text>
+    <text x="418" y="170" class="member">+ id: UUID</text><text x="418" y="194" class="member">+ userId: UUID</text><text x="418" y="218" class="member">+ status: string</text><text x="418" y="252" class="member">+ handleMessage(text)</text><text x="418" y="276" class="member">+ requestClarification()</text>
+
+    <rect x="760" y="105" width="280" height="190" rx="8" fill="#ffedd5" stroke="#c2410c" stroke-width="2"/>
+    <line x1="760" y1="145" x2="1040" y2="145" stroke="#c2410c"/><text x="900" y="132" class="classTitle" text-anchor="middle">AppointmentService</text>
+    <text x="778" y="175" class="member">+ search(criteria)</text><text x="778" y="207" class="member">+ book(option, confirmation)</text><text x="778" y="239" class="member">+ cancel(appointment, confirmation)</text>
+
+    <rect x="1110" y="105" width="240" height="190" rx="8" fill="#f3e8ff" stroke="#7e22ce" stroke-width="2"/>
+    <line x1="1110" y1="145" x2="1350" y2="145" stroke="#7e22ce"/><text x="1230" y="125" class="classTitle" text-anchor="middle">ProviderAdapter</text><text x="1230" y="143" class="relation" text-anchor="middle">interface</text>
+    <text x="1128" y="175" class="member">+ findSlots(criteria)</text><text x="1128" y="207" class="member">+ createBooking(slotId)</text><text x="1128" y="239" class="member">+ cancelBooking(reference)</text>
+
+    <rect x="60" y="420" width="280" height="215" rx="8" fill="#fff7ed" stroke="#c2410c" stroke-width="2"/>
+    <line x1="60" y1="460" x2="340" y2="460" stroke="#c2410c"/><text x="200" y="447" class="classTitle" text-anchor="middle">Appointment</text>
+    <text x="78" y="486" class="member">+ id: UUID</text><text x="78" y="510" class="member">+ userId: UUID</text><text x="78" y="534" class="member">+ providerName: string</text><text x="78" y="558" class="member">+ startsAt: datetime</text><text x="78" y="582" class="member">+ location: string</text><text x="78" y="606" class="member">+ status: string</text>
+
+    <rect x="400" y="420" width="280" height="190" rx="8" fill="#fff7ed" stroke="#c2410c" stroke-width="2"/>
+    <line x1="400" y1="460" x2="680" y2="460" stroke="#c2410c"/><text x="540" y="447" class="classTitle" text-anchor="middle">AppointmentOption</text>
+    <text x="418" y="486" class="member">+ slotId: string</text><text x="418" y="510" class="member">+ providerName: string</text><text x="418" y="534" class="member">+ startsAt: datetime</text><text x="418" y="558" class="member">+ location: string</text>
+
+    <rect x="740" y="420" width="310" height="215" rx="8" fill="#fef3c7" stroke="#a16207" stroke-width="2"/>
+    <line x1="740" y1="460" x2="1050" y2="460" stroke="#a16207"/><text x="895" y="447" class="classTitle" text-anchor="middle">ConfirmationRequest</text>
+    <text x="758" y="486" class="member">+ id: UUID</text><text x="758" y="510" class="member">+ userId: UUID</text><text x="758" y="534" class="member">+ actionType: string</text><text x="758" y="558" class="member">+ actionSummary: string</text><text x="758" y="582" class="member">+ status: string</text><text x="758" y="606" class="member">+ approve() / reject()</text>
+
+    <rect x="1110" y="420" width="240" height="190" rx="8" fill="#faf5ff" stroke="#7e22ce" stroke-width="2"/>
+    <line x1="1110" y1="460" x2="1350" y2="460" stroke="#7e22ce"/><text x="1230" y="447" class="classTitle" text-anchor="middle">MockProviderAdapter</text>
+    <text x="1128" y="486" class="member">+ findSlots(criteria)</text><text x="1128" y="518" class="member">+ createBooking(slotId)</text><text x="1128" y="550" class="member">+ cancelBooking(reference)</text>
+
+    <rect x="60" y="745" width="280" height="155" rx="8" fill="#f8fafc" stroke="#64748b" stroke-width="2" stroke-dasharray="7 5"/>
+    <line x1="60" y1="785" x2="340" y2="785" stroke="#64748b"/><text x="200" y="772" class="classTitle" text-anchor="middle">Reminder — later sprint</text>
+    <text x="78" y="812" class="member">+ appointmentId: UUID</text><text x="78" y="836" class="member">+ scheduledFor: datetime</text><text x="78" y="860" class="member">+ deliver() / acknowledge()</text>
+  </g>
+
+  <path class="edge" d="M320 185 H400"/><text x="360" y="176" class="relation" text-anchor="middle">sessions</text>
+  <path class="edge" d="M540 295 V350 H900 V295"/><text x="720" y="341" class="relation" text-anchor="middle">uses</text>
+  <path class="edge" d="M1040 200 H1110"/><text x="1075" y="191" class="relation" text-anchor="middle">adapter</text>
+  <path class="edge dash" d="M1230 295 V420"/><text x="1288" y="362" class="relation">implemented by</text>
+  <path class="edge" d="M200 275 V420"/><text x="237" y="355" class="relation">owns</text>
+  <path class="edge" d="M320 230 H360 V527 H400"/><text x="366" y="511" class="relation">options</text>
+  <path class="edge" d="M900 295 V420"/><text x="941" y="360" class="relation">requires</text>
+  <path class="edge" d="M760 260 H710 V515 H680"/><text x="711" y="501" class="relation">returns</text>
+  <path class="edge dash" d="M200 635 V745"/><text x="236" y="695" class="relation">triggers</text>
+</svg>

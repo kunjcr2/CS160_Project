@@ -47,13 +47,13 @@ Seven of 13 respondents reported that the older adult had delayed or avoided mak
 
 Using patient portals or healthcare apps was the most frequently selected difficult task (7 of 13). Language barriers and remembering appointments were each selected by 5 respondents. Making or changing appointments and remembering medications were each selected by 4 respondents.
 
-![Reported healthcare-task difficulties](healthcare-task-difficulties.svg)
+![Reported healthcare-task difficulties](assets/healthcare-task-difficulties.svg)
 
 ### 2. Appointment management should be the central product capability
 
 Doctor appointment booking was selected by 12 of 13 respondents as one of their three priorities. Appointment reminders were selected by 9 respondents, and medication reminders by 8. This establishes a clear healthcare-management focus rather than a general-purpose assistant focus.
 
-![Top-three feature priorities](feature-priorities.svg)
+![Top-three feature priorities](assets/feature-priorities.svg)
 
 ### 3. Language support is a core accessibility requirement
 
@@ -111,8 +111,8 @@ The responses support a focused product: a trustworthy, multilingual voice assis
 
 ## Source Materials
 
-- [Survey assignment and reporting requirements](<../Sprint-(-1)/TODO.md>)
-- [Project idea and candidate feature list](<../Sprint-(-1)/IDEA.md>)
-- [Survey findings summary](<../Sprint-(-1)/FEATURES_RAW.md>)
+- [Survey assignment and reporting requirements](<../../Sprint-(-1)/TODO.md>)
+- [Project idea and candidate feature list](<../../Sprint-(-1)/IDEA.md>)
+- [Survey findings summary](<../../Sprint-(-1)/FEATURES_RAW.md>)
 - `CS 160 - Team 4 Project Survey Responses.xlsx` in `Sprint-(-1)`
 - Use of LLM for factoring out mess from the draft

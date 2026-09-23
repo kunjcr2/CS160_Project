@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">CS160 Project component diagram</title>
+  <desc id="desc">React frontend components connect through an API client to Python API routes, conversation services, appointment services, confirmation services, repositories, and adapters.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#334155"/></marker>
+    <style>text{font-family:Arial,sans-serif;fill:#172033}.title{font-size:28px;font-weight:700}.group{font-size:19px;font-weight:700}.box{font-size:16px;font-weight:700}.small{font-size:13px;fill:#475569}.line{stroke:#334155;stroke-width:2;fill:none;marker-end:url(#arrow)}.future{stroke-dasharray:7 5}</style>
+  </defs>
+  <rect width="1200" height="760" fill="#ffffff"/>
+  <text x="50" y="48" class="title">Component Diagram — Draft</text>
+
+  <rect x="35" y="85" width="330" height="600" rx="14" fill="#f0fdfa" stroke="#5eead4" stroke-width="2"/>
+  <text x="55" y="120" class="group">React Frontend</text>
+  <rect x="85" y="155" width="230" height="60" rx="8" fill="#ccfbf1" stroke="#0f766e" stroke-width="2"/><text x="200" y="191" class="box" text-anchor="middle">Conversation UI</text>
+  <rect x="65" y="260" width="130" height="62" rx="8" fill="#f0fdfa" stroke="#0f766e" stroke-width="2"/><text x="130" y="286" class="box" text-anchor="middle">Typed input</text><text x="130" y="307" class="small" text-anchor="middle">required fallback</text>
+  <rect x="205" y="260" width="130" height="62" rx="8" fill="#f0fdfa" stroke="#0f766e" stroke-width="2" stroke-dasharray="7 5"/><text x="270" y="286" class="box" text-anchor="middle">Voice control</text><text x="270" y="307" class="small" text-anchor="middle">TBD</text>
+  <rect x="85" y="375" width="230" height="62" rx="8" fill="#ccfbf1" stroke="#0f766e" stroke-width="2"/><text x="200" y="401" class="box" text-anchor="middle">Confirmation card</text><text x="200" y="422" class="small" text-anchor="middle">approve or reject</text>
+  <rect x="85" y="535" width="230" height="60" rx="8" fill="#ccfbf1" stroke="#0f766e" stroke-width="2"/><text x="200" y="571" class="box" text-anchor="middle">API client</text>
+
+  <rect x="405" y="85" width="475" height="600" rx="14" fill="#fff7ed" stroke="#fdba74" stroke-width="2"/>
+  <text x="425" y="120" class="group">Python Backend</text>
+  <rect x="535" y="150" width="215" height="58" rx="8" fill="#ffedd5" stroke="#c2410c" stroke-width="2"/><text x="642" y="185" class="box" text-anchor="middle">API routes</text>
+  <rect x="535" y="250" width="215" height="62" rx="8" fill="#ffedd5" stroke="#c2410c" stroke-width="2"/><text x="642" y="276" class="box" text-anchor="middle">Conversation service</text><text x="642" y="297" class="small" text-anchor="middle">session and orchestration</text>
+  <rect x="440" y="365" width="130" height="65" rx="8" fill="#fff7ed" stroke="#c2410c" stroke-width="2"/><text x="505" y="392" class="box" text-anchor="middle">Intent</text><text x="505" y="413" class="small" text-anchor="middle">rules / AI TBD</text>
+  <rect x="580" y="365" width="130" height="65" rx="8" fill="#fff7ed" stroke="#c2410c" stroke-width="2"/><text x="645" y="392" class="box" text-anchor="middle">Confirmation</text><text x="645" y="413" class="small" text-anchor="middle">service</text>
+  <rect x="720" y="365" width="130" height="65" rx="8" fill="#fff7ed" stroke="#c2410c" stroke-width="2"/><text x="785" y="392" class="box" text-anchor="middle">Appointment</text><text x="785" y="413" class="small" text-anchor="middle">service</text>
+  <rect x="535" y="505" width="215" height="62" rx="8" fill="#ffedd5" stroke="#c2410c" stroke-width="2"/><text x="642" y="531" class="box" text-anchor="middle">SQL repositories</text><text x="642" y="552" class="small" text-anchor="middle">persistence boundary</text>
+
+  <rect x="920" y="85" width="245" height="600" rx="14" fill="#faf5ff" stroke="#d8b4fe" stroke-width="2"/>
+  <text x="940" y="120" class="group">Infrastructure</text>
+  <rect x="960" y="155" width="165" height="62" rx="8" fill="#f3e8ff" stroke="#7e22ce" stroke-width="2"/><text x="1042" y="181" class="box" text-anchor="middle">SQL database</text><text x="1042" y="202" class="small" text-anchor="middle">engine TBD</text>
+  <rect x="960" y="285" width="165" height="62" rx="8" fill="#f3e8ff" stroke="#7e22ce" stroke-width="2"/><text x="1042" y="311" class="box" text-anchor="middle">Mock provider</text><text x="1042" y="332" class="small" text-anchor="middle">seeded slots</text>
+  <rect x="960" y="415" width="165" height="62" rx="8" fill="#faf5ff" stroke="#7e22ce" stroke-width="2" stroke-dasharray="7 5"/><text x="1042" y="441" class="box" text-anchor="middle">Voice adapter</text><text x="1042" y="462" class="small" text-anchor="middle">TBD</text>
+  <rect x="960" y="545" width="165" height="62" rx="8" fill="#faf5ff" stroke="#7e22ce" stroke-width="2" stroke-dasharray="7 5"/><text x="1042" y="571" class="box" text-anchor="middle">AI adapter</text><text x="1042" y="592" class="small" text-anchor="middle">TBD</text>
+
+  <path class="line" d="M200 215 V260"/><path class="line" d="M165 322 L190 375"/><path class="line future" d="M260 322 L220 375"/><path class="line" d="M200 437 V535"/>
+  <path class="line" d="M315 565 H535 V208"/><path class="line" d="M642 208 V250"/><path class="line" d="M600 312 L520 365"/><path class="line" d="M642 312 V365"/><path class="line" d="M685 312 L770 365"/><path class="line" d="M645 430 V505"/><path class="line" d="M785 430 L700 505"/>
+  <path class="line" d="M750 536 H900 V186 H960"/><path class="line" d="M850 398 H910 V316 H960"/><path class="line future" d="M335 291 H900 V446 H960"/><path class="line future" d="M440 398 H390 V640 H930 V576 H960"/>
+</svg>
