@@ -1,14 +1,8 @@
 ID,Epic,User story,Priority,Estimate points,Target sprint,Status,Notes
-PB-01,Core interaction,"As a user, I want to enter a request through a simple conversation interface so that I do not need to navigate complex menus.",Must,5,Sprint 1,Not started,Typed interaction first; voice adapter TBD
-PB-02,Safety and trust,"As a user, I want every consequential action read back for confirmation so that the assistant does not act without my approval.",Must,5,Sprint 1,Not started,First implementation targets appointment booking
-PB-03,Appointments,"As a user, I want to request a doctor appointment in natural language so that scheduling is easier.",Must,8,Sprint 1-2,Not started,Use mock appointment slots initially
-PB-04,Appointments,"As a user, I want to see or hear my upcoming appointments so that I know what is scheduled.",Must,5,Sprint 2,Not started,
-PB-05,Reminders,"As a user, I want configurable appointment reminders so that I do not miss appointments.",Must,5,Sprint 2,Not started,
-PB-06,Medication,"As a user, I want medication reminders and an acknowledgement option so that I can keep track of doses.",Must,8,Future,Not started,Requires careful safety wording
-PB-07,Accessibility,"As a user, I want the assistant to support my preferred language so that I can complete important tasks comfortably.",Must,13,Future,Not started,Languages and providers TBD
-PB-08,Care communication,"As a user, I want to dictate a message to my care team and confirm it before sending.",Should,8,Future,Not started,Mock integration before any real provider integration
-PB-09,Fallback,"As a user, I want typed choices or human/caregiver help when the assistant cannot understand me.",Should,5,Sprint 2,Not started,
-PB-10,Caregiver access,"As a user, I want to control exactly which task-level information a caregiver can see.",Should,13,Future,Not started,Never expose conversation transcripts
-PB-11,Check-ins,"As a user, I want to configure or disable proactive check-ins so that they do not become intrusive.",Could,8,Future,Not started,Survey feedback was mixed
-PB-12,Transportation,"As a user, I want help arranging a ride to an appointment.",Could,13,Future,Deferred,Weak survey priority and external integration required
-PB-13,Engineering,"As a team, we want automated tests and continuous integration so that changes can be reviewed safely.",Must,5,Sprint 1-2,Not started,
+PB-01,Appointments,"As a user, I want to book a doctor appointment so that I can schedule care more easily.",Must,8,TBD,Not started,"Survey: 3.54/5 usefulness; selected in top 3 by 12/13 respondents"
+PB-02,Reminders,"As a user, I want appointment reminders so that I do not miss scheduled care.",Must,5,TBD,Not started,"Survey: 3.54/5 usefulness; selected in top 3 by 9/13 respondents"
+PB-03,Medication,"As a user, I want medication reminders so that I can keep track of my doses.",Must,8,TBD,Not started,"Survey: 3.62/5 usefulness; selected in top 3 by 8/13 respondents"
+PB-04,Medication,"As a user, I want prescription refill assistance so that I can request refills before I run out of medication.",Should,8,TBD,Not started,"Survey: 3.46/5 usefulness; selected in top 3 by 0/13 respondents"
+PB-05,Accessibility,"As a user, I want multilingual voice support so that I can use the assistant in my preferred language.",Should,13,TBD,Not started,"Survey: 3.38/5 usefulness; selected in top 3 by 3/13 respondents"
+PB-06,Support,"As a user, I want human assistance or a live-agent handoff when needed so that I can get help with difficult requests.",Should,8,TBD,Not started,"Survey: 3.38/5 usefulness; selected in top 3 by 1/13 respondents"
+PB-07,Care communication,"As a user, I want to message my doctor or care team so that I can communicate about my care.",Should,8,TBD,Not started,"Survey: 3.23/5 usefulness; selected in top 3 by 3/13 respondents"
