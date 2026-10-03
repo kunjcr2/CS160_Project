@@ -1,0 +1,9 @@
+Date,Team Member,Task ID,Work Performed,Hours,Status,Blockers or Decisions,Evidence,Review Note
+2026-10-03,Zohreh Ashtarilarki,S1-01,Summarized the survey findings and documented the seven selected core features,2,Verified,,../report/Team Project Sprint #1 Activities.pdf,""
+2026-10-03,Zohreh Ashtarilarki,S1-02,"Prepared the component diagram for the frontend, backend, database, voice, and AI boundaries",5,Verified,,../report/Team Project Sprint #1 Activities.pdf,""
+2026-10-03,Amarjargal Ayurzana,S1-03,Prepared the high-level architecture diagram and documented the selected technology stack,2,Verified,,../report/Team Project Sprint #1 Activities.pdf,""
+2026-10-03,Amarjargal Ayurzana,S1-04,Prepared the provisional class diagram for the main domain entities and services,2,Verified,,../report/Team Project Sprint #1 Activities.pdf,""
+2026-10-03,Moebius Yang,S1-05,Prepared the Sprint 1 appointment-request and confirmation sequence diagram,2,Verified,,../report/Team Project Sprint #1 Activities.pdf,""
+2026-10-03,Moebius Yang,S1-06,Organized the Sprint 1 report and drafted the end-of-sprint summary,2,Verified,,../README.md,""
+2026-10-03,Kunj Shah,S1-07,Organized the shared GitHub repository and documented team profile and source-code links,1,Verified,,../README.md,""
+2026-10-03,Kunj Shah,S1-08,"Documented the scope, product backlog, sprint backlog, task assignments, and Sprint 2 plan",4,Verified,,PRODUCT_BACKLOG.csv; SPRINT_BACKLOG.csv; ../README.md,""

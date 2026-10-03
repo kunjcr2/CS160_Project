@@ -1,6 +1,6 @@
 # CS160_Project — Sprint 1 Documentation
 
-> **Draft:** This document records the team's current direction during project setup. Architecture, scope, assignments, estimates, and technology choices are provisional and should be updated after the team agrees on them.
+> **End-of-sprint draft:** The completed work, task hours, and finish dates below are provisional and should be confirmed by each team member before submission.
 
 **Course:** CS 160 Software Engineering, Section 05  
 **Institution:** San José State University, Department of Computer Science  
@@ -9,7 +9,7 @@
 **Project name:** CS160_Project  
 **Sprint:** Sprint 1  
 **Sprint dates:** September 21–October 4, 2026  
-**Status:** In progress — setup and planning stage
+**Status:** End-of-sprint review — planning and specification completed; implementation carries into Sprint 2
 
 ## Table of Contents
 
@@ -31,30 +31,30 @@ Assignments are provisional until confirmed by the whole team.
 
 | Team member | GitHub username | Draft responsibility |
 | --- | --- | --- |
-| Moebius Yang | _TBD_ | Frontend |
+| Moebius Yang | [momoyang0828](https://github.com/momoyang0828) | Frontend |
 | Zohreh Ashtarilarki | [ZohrehAshtarilarki](https://github.com/ZohrehAshtarilarki) | Backend |
 | Amarjargal Ayurzana | [Akiko0210](https://github.com/Akiko0210) | Backend |
 | Kunj Shah | [kunjcr2](https://github.com/kunjcr2) | AI and voice exploration |
 
 ## 2. Survey Report
 
-The completed survey analysis is available in the [survey report](report/SURVEY_REPORT.md). The survey indicates that appointment booking, appointment reminders, medication reminders, multilingual interaction, and explicit confirmation are the strongest product needs.
+The completed survey analysis is included in the [Sprint 1 activities report](report/Team%20Project%20Sprint%20%231%20Activities.pdf). The survey indicates that appointment booking, appointment reminders, medication reminders, multilingual interaction, and explicit confirmation are the strongest product needs.
 
 The survey sample contains 13 caregiver/supporter responses and no direct older-adult responses. All product decisions based on it remain hypotheses until validated with the intended users.
 
 ## 3. Sprint 1 Scope and Goals
 
-Sprint 1 is a foundation sprint. No implementation was complete when this draft was created, so the goal is to establish a small, testable vertical slice rather than attempt the full survey-driven product.
+Sprint 1 is a planning and specification sprint. The goal is to finalize the product direction, document the system design, organize the shared repository, and prepare the team to begin implementation.
 
-### Proposed Sprint 1 deliverables
+### Sprint 1 deliverables
 
-1. Agree on the architecture, development workflow, and definition of done.
-2. Create a React frontend shell with a basic conversation screen.
-3. Create a Python backend shell with health and conversation endpoints.
-4. Define an initial SQL schema for users, appointments, confirmations, and reminders.
-5. Evaluate voice and AI options and record a team decision; keep typed interaction as the fallback.
-6. Demonstrate a mocked appointment-request flow with explicit confirmation before booking.
-7. Maintain the product backlog, Sprint 1 backlog, and sprint log.
+1. Finalize the seven core features using the survey results.
+2. Define the project scope and supporting system requirements.
+3. Complete the architectural block, component, sequence, and class diagrams.
+4. Select React, Python with FastAPI, PostgreSQL, OpenAI Whisper for speech-to-text, OpenAI TTS for speech output, and the OpenAI API for AI features.
+5. Create the product backlog, Sprint 1 backlog, task assignments, and sprint log.
+6. Organize the shared GitHub repository and Sprint 1 documentation.
+7. Record the sprint outcome and prepare the Sprint 2 implementation plan.
 
 ### Explicitly outside Sprint 1
 
@@ -67,13 +67,13 @@ Sprint 1 is a foundation sprint. No implementation was complete when this draft 
 
 ## 4. Architectural Block and Component Diagrams
 
-The draft architecture uses React, Python, and SQL. Voice/AI providers and the SQL database engine have not been selected. External healthcare services are represented by mock adapters for this sprint.
+The selected stack uses React, Python with FastAPI, PostgreSQL, OpenAI Whisper for speech-to-text, OpenAI TTS for speech output, and the OpenAI API for AI features. External healthcare services are represented by mock adapters during early development.
 
-See the consolidated [system design](design/SYSTEM_DESIGN.md) for the high-level architectural block diagram, component diagram, technology decisions, and system boundaries.
+The high-level architectural block diagram and component diagram are included in the [Sprint 1 activities report](report/Team%20Project%20Sprint%20%231%20Activities.pdf).
 
 ## 5. Sequence Diagrams
 
-See the consolidated [system design](design/SYSTEM_DESIGN.md#sequence-diagrams) for draft sequences covering:
+The sequence diagrams in the [Sprint 1 activities report](report/Team%20Project%20Sprint%20%231%20Activities.pdf) cover:
 
 - Appointment request and explicit confirmation
 - Failed AI/voice understanding and fallback
@@ -83,7 +83,7 @@ Only the appointment-request sequence is proposed for implementation during Spri
 
 ## 6. Class Diagram
 
-See the consolidated [system design](design/SYSTEM_DESIGN.md#class-diagram) for the provisional domain model. It is a design aid and does not imply that all displayed classes will be implemented during Sprint 1.
+The class diagram is included in the [Sprint 1 activities report](report/Team%20Project%20Sprint%20%231%20Activities.pdf). It is a design aid and does not imply that all displayed classes will be implemented during Sprint 1.
 
 ## 7. Git Source Code
 
@@ -95,7 +95,7 @@ The team should use feature branches and pull requests once implementation begin
 
 ## 8. Backlog and Sprint Log
 
-Local draft files are included until the team creates the shared Google Sheets:
+Local CSV copies are maintained with the repository:
 
 - [Product backlog](planning/PRODUCT_BACKLOG.csv)
 - [Sprint 1 backlog](planning/SPRINT_BACKLOG.csv)
@@ -103,40 +103,39 @@ Local draft files are included until the team creates the shared Google Sheets:
 
 | Shared document | Link |
 | --- | --- |
-| Product backlog Google Sheet | _TBD_ |
-| Sprint tracking Google Sheet | _TBD_ |
+| Product backlog Google Sheet | **Add the shareable Google Sheets URL here before submission** |
+| Sprint tracking Google Sheet | **Add the shareable Google Sheets URL here before submission** |
 
 ## 9. Sprint Summary
 
-Sprint 1 is still in progress. At the time of this draft, the team had organized the repository and prepared the survey report, but application implementation had not started. The primary risk is beginning development before agreeing on the interface between the React frontend, Python backend, SQL data model, and future voice/AI layer.
+Sprint 1 completed the planning and specification work needed to begin development. The team reviewed 13 caregiver/supporter survey responses, selected seven core product features, defined the initial scope, completed the architecture and design diagrams, created the product and sprint backlogs, assigned work across the four team members, selected the initial technology stack, and organized the shared GitHub repository.
 
-The remainder of the sprint should prioritize a working repository structure and one mocked end-to-end appointment flow. A small integrated demonstration is more useful than several disconnected partial features.
+Application implementation was not completed during Sprint 1 and will carry into Sprint 2. The React frontend, FastAPI backend, PostgreSQL schema, mocked appointment workflow, automated tests, and voice pipeline still need to be built. The survey also did not include direct responses from older adults, so the feature decisions remain hypotheses that should be validated with intended users.
 
-This section must be updated at the end of Sprint 1 with completed work, incomplete work, actual hours, blockers, lessons learned, and links to relevant commits or pull requests.
+What went well was the use of survey evidence to narrow the product scope and the creation of a shared architecture before implementation. The main blockers were limited time, missing direct older-adult feedback, and the need to finalize the technology stack. In Sprint 2, the team should record work in the sprint log as it happens, use feature branches and pull requests, and focus on one small end-to-end appointment flow before expanding to other features.
+
+The provisional Sprint 1 effort is 24 team hours based on the sprint backlog. Each member must replace the draft hours, finish dates, status, and blockers in the backlog and sprint log with their actual information before submission. Relevant repository history is available through the [project commits](https://github.com/kunjcr2/CS160_Project/commits/main/).
 
 ## 10. Plans for Sprint 2
 
 The provisional Sprint 2 goal is to turn the mocked appointment flow into a stable vertical slice and begin reminders. Proposed work:
 
-1. Integrate the React conversation interface with the Python API.
-2. Persist users, appointments, and confirmations in the selected SQL database.
+1. Create the React conversation interface and connect it to the Python/FastAPI API.
+2. Create the PostgreSQL schema and persist users, appointments, and confirmations.
 3. Implement appointment lookup, proposal, confirmation, and cancellation against a mock provider service.
 4. Add appointment reminders with configurable timing.
 5. Add automated tests for confirmation and error paths.
-6. Begin a voice-input/output prototype after the Sprint 1 technology decision.
+6. Prototype voice input with OpenAI Whisper and speech output with OpenAI TTS.
 7. Conduct usability feedback with at least one intended user if possible.
 
 This plan should be revised using Sprint 1 results and the team's actual capacity.
 
 ## 11. Open Decisions
 
-- Voice recognition and text-to-speech provider
-- AI model/provider and whether it is needed in the first vertical slice
-- Python web framework
-- SQL database engine and data-access library
+- PostgreSQL driver, ORM, and migration tool
+- OpenAI model choices and request limits for the first vertical slice
 - Authentication approach
 - Frontend component and styling approach
 - Hosting/deployment platform
-- Moebius Yang's GitHub username
-- Final task ownership, estimates, and availability
-- Google Sheet links
+- Final actual hours, completion dates, and blockers after team review
+- Google Sheets links
