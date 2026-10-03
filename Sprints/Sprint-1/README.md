@@ -95,16 +95,9 @@ The team should use feature branches and pull requests once implementation begin
 
 ## 8. Backlog and Sprint Log
 
-Local CSV copies are maintained with the repository:
+The product backlog, sprint backlog, task assignments, hours, and sprint log are maintained directly in the team's shared Google Sheet:
 
-- [Product backlog](planning/PRODUCT_BACKLOG.csv)
-- [Sprint 1 backlog](planning/SPRINT_BACKLOG.csv)
-- [Sprint 1 log](planning/SPRINT_LOG.csv)
-
-| Shared document | Link |
-| --- | --- |
-| Product backlog Google Sheet | **Add the shareable Google Sheets URL here before submission** |
-| Sprint tracking Google Sheet | **Add the shareable Google Sheets URL here before submission** |
+- [Team 4 Backlog and Sprint Tracking Spreadsheet](https://docs.google.com/spreadsheets/d/1iR9OpHEgezQ6xWYhkhqq9mEUmC7vyZcnP1gC6susOxo/edit?usp=sharing)
 
 ## 9. Sprint Summary
 
@@ -114,7 +107,7 @@ Application implementation was not completed during Sprint 1 and will carry into
 
 What went well was the use of survey evidence to narrow the product scope and the creation of a shared architecture before implementation. The main blockers were limited time, missing direct older-adult feedback, and the need to finalize the technology stack. In Sprint 2, the team should record work in the sprint log as it happens, use feature branches and pull requests, and focus on one small end-to-end appointment flow before expanding to other features.
 
-The provisional Sprint 1 effort is 24 team hours based on the sprint backlog. Each member must replace the draft hours, finish dates, status, and blockers in the backlog and sprint log with their actual information before submission. Relevant repository history is available through the [project commits](https://github.com/kunjcr2/CS160_Project/commits/main/).
+Sprint 1 effort, task assignments, finish dates, status, and blockers are maintained in the shared Google Sheet. Each member must confirm their information there before submission. Relevant repository history is available through the [project commits](https://github.com/kunjcr2/CS160_Project/commits/main/).
 
 ## 10. Plans for Sprint 2
 
@@ -137,5 +130,4 @@ This plan should be revised using Sprint 1 results and the team's actual capacit
 - Authentication approach
 - Frontend component and styling approach
 - Hosting/deployment platform
-- Final actual hours, completion dates, and blockers after team review
-- Google Sheets links
+- Final actual hours, completion dates, and blockers after team review in the shared Google Sheet

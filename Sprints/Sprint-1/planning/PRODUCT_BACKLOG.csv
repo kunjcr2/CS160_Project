@@ -1,8 +1,0 @@
-ID,Epic,User story,Priority,Estimate points,Target sprint,Status,Notes
-PB-01,Appointments,"As a user, I want to book a doctor appointment so that I can schedule care more easily.",Must,8,TBD,Not started,"Survey: 3.54/5 usefulness; selected in top 3 by 12/13 respondents"
-PB-02,Reminders,"As a user, I want appointment reminders so that I do not miss scheduled care.",Must,5,TBD,Not started,"Survey: 3.54/5 usefulness; selected in top 3 by 9/13 respondents"
-PB-03,Medication,"As a user, I want medication reminders so that I can keep track of my doses.",Must,8,TBD,Not started,"Survey: 3.62/5 usefulness; selected in top 3 by 8/13 respondents"
-PB-04,Medication,"As a user, I want prescription refill assistance so that I can request refills before I run out of medication.",Should,8,TBD,Not started,"Survey: 3.46/5 usefulness; selected in top 3 by 0/13 respondents"
-PB-05,Accessibility,"As a user, I want multilingual voice support so that I can use the assistant in my preferred language.",Should,13,TBD,Not started,"Survey: 3.38/5 usefulness; selected in top 3 by 3/13 respondents"
-PB-06,Support,"As a user, I want human assistance or a live-agent handoff when needed so that I can get help with difficult requests.",Should,8,TBD,Not started,"Survey: 3.38/5 usefulness; selected in top 3 by 1/13 respondents"
-PB-07,Care communication,"As a user, I want to message my doctor or care team so that I can communicate about my care.",Should,8,TBD,Not started,"Survey: 3.23/5 usefulness; selected in top 3 by 3/13 respondents"

@@ -1,9 +1,0 @@
-Task ID,Task,Assignee,Estimated Hours,Actual Hours,Date Assigned,Target Date,Date Finished,Status,Acceptance Evidence
-S1-01,Summarize survey results and finalize the seven core features,Zohreh Ashtarilarki,3,2,2026-09-21,2026-10-04,2026-10-03,Verified,Report lists the seven selected features and explains the survey priorities
-S1-02,Create the component diagram,Zohreh Ashtarilarki,3,5,2026-09-21,2026-10-04,2026-10-03,Verified,"Diagram shows the main frontend, backend, database, and AI components"
-S1-03,Create the high-level architecture diagram and label the technologies,Amarjargal Ayurzana,3,2,2026-09-21,2026-10-04,2026-10-03,Verified,"Diagram identifies React, FastAPI, PostgreSQL, and the external AI API"
-S1-04,Create the class diagram for the main system entities,Amarjargal Ayurzana,3,2,2026-09-21,2026-10-04,2026-10-03,Verified,Diagram shows the main classes and their relationships
-S1-05,Create the Sprint 1 sequence diagram,Moebius Yang,3,2,2026-09-21,2026-10-04,2026-10-03,Verified,Diagram shows the selected Sprint 1 interaction from request through confirmation
-S1-06,Assemble the Sprint 1 report and complete the sprint summary,Moebius Yang,3,2,2026-09-21,2026-10-04,2026-10-03,Verified,Report follows the required order and includes the completed sprint summary
-S1-07,Set up the shared GitHub repository and add team and source-code links,Kunj Shah,2,1,2026-09-21,2026-10-04,2026-10-03,Verified,Repository is shared and the report contains team profiles and source links
-S1-08,"Define the project scope and prepare the product backlog, sprint backlog, and next-sprint plan",Kunj Shah,4,4,2026-09-21,2026-10-04,2026-10-03,Verified,"Scope, both backlogs, task assignments, and the next-sprint plan are documented"
