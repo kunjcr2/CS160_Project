@@ -95,9 +95,19 @@ The team should use feature branches and pull requests once implementation begin
 
 ## 8. Backlog and Sprint Log
 
-The product backlog, sprint backlog, task assignments, hours, and sprint log are maintained directly in the team's shared Google Sheet:
+All tracking is kept in the team's shared Google Sheet, **Team 4 Backlogs**:
 
-- [Team 4 Backlog and Sprint Tracking Spreadsheet](https://docs.google.com/spreadsheets/d/1iR9OpHEgezQ6xWYhkhqq9mEUmC7vyZcnP1gC6susOxo/edit?usp=sharing)
+- [Team 4 Backlogs spreadsheet](https://docs.google.com/spreadsheets/d/1PyE_Iw9B7tvLMdN2w4PInKtuA1yfTM7f881EL9eztDg/edit)
+
+Sprint 1 uses these tabs:
+
+| Tab | What it contains |
+| --- | --- |
+| [Product Backlog](https://docs.google.com/spreadsheets/d/1PyE_Iw9B7tvLMdN2w4PInKtuA1yfTM7f881EL9eztDg/edit?gid=0#gid=0) | The full list of features and supporting work, with priority, estimate points, target sprint, and status. This is a living list that is updated every sprint. |
+| [Sprint 1 Backlog](https://docs.google.com/spreadsheets/d/1PyE_Iw9B7tvLMdN2w4PInKtuA1yfTM7f881EL9eztDg/edit?gid=616597569#gid=616597569) | Each Sprint 1 task with its assignee, estimated and actual hours, date assigned, target date, date finished, status, and acceptance evidence. |
+| [Sprint 1 Log](https://docs.google.com/spreadsheets/d/1PyE_Iw9B7tvLMdN2w4PInKtuA1yfTM7f881EL9eztDg/edit?gid=427637020#gid=427637020) | A day-by-day record of the work performed, hours, status, blockers or decisions, and evidence. |
+
+Each sprint gets its own backlog and log tab, as the course requires.
 
 ## 9. Sprint Summary
 

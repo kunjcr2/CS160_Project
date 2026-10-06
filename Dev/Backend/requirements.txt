@@ -1,1 +1,22 @@
-Flask==3.1.2
+# Runtime dependencies. Install:  pip install -r requirements-dev.txt
+# "~=" allows bug-fix updates only, so all four of us get the same behavior.
+
+# Web framework
+fastapi~=0.142.2
+uvicorn[standard]~=0.54.0
+
+# Database (PostgreSQL)
+sqlalchemy~=2.1
+alembic~=1.20
+psycopg[binary]~=3.3
+
+# Settings / validation
+pydantic-settings~=2.15
+
+# Auth
+argon2-cffi~=25.1
+PyJWT~=2.15
+
+# HTTP client + OpenAI (Whisper, TTS, chat)
+httpx~=0.28.1
+openai~=3.24
