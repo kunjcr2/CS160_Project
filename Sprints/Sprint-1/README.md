@@ -97,7 +97,7 @@ The team should use feature branches and pull requests once implementation begin
 
 All tracking is kept in the team's shared Google Sheet, **Team 4 Backlogs**:
 
-- [Team 4 Backlogs spreadsheet](https://docs.google.com/spreadsheets/d/1PyE_Iw9B7tvLMdN2w4PInKtuA1yfTM7f881EL9eztDg/edit)
+- [Team 4 Backlogs spreadsheet](https://docs.google.com/spreadsheets/d/1PyE_Iw9B7tvLMdN2w4PInKtuA1yfTM7f881EL9eztDg/edit?gid=0#gid=0)
 
 Sprint 1 uses these tabs:
 

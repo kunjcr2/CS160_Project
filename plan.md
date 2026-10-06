@@ -385,7 +385,7 @@ These aren't in the feature list, but the 7 features won't work without them.
 Shape the mock data after real FHIR resources so the engineering is credible:
 `Practitioner`, `Slot`, `Appointment`, `MedicationRequest`, `Communication`.
 - Add realistic **latency** and **random failures** (configurable). Our error paths need something to test against.
-- Put it behind an interface (`HealthcareProvider`) in `providers/`, with `MockHealthcareProvider` as the only implementation for now.
+- Put it behind an interface (`HealthcareProvider`) in `app/adapters/healthcare/`, with `MockHealthcareProvider` as the only implementation for now.
 
 ### 6.3 Scheduler / background worker (needed by PB-02 and PB-03)
 Reminders must fire even when nobody is making a request. Recommended simple, robust design:

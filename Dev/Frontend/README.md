@@ -10,4 +10,4 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:5173>. The Vite development server proxies `/api` requests to the Flask backend on port 5000.
+Open <http://localhost:5173>. The Vite development server proxies `/api` requests to the FastAPI backend on port 5000.
