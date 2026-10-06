@@ -106,6 +106,21 @@ Every feature depends on these:
 5. **Error handling and fallback**: explain the problem, ask a simpler question or retry, offer another path, and offer human help when automation can't continue. (§7)
 6. **Mock healthcare services**: mock provider, pharmacy, appointment, and care-team services and data instead of real hospital integrations. (§6.2)
 
+In the team spreadsheet (Product Backlog tab), the supporting work planned for Sprint 2 is tracked as **SR-01 to SR-08**:
+
+| ID | Supporting work | Plan reference |
+|---|---|---|
+| SR-01 | FastAPI backend with MVC structure | §4, §11 |
+| SR-02 | PostgreSQL + Alembic migrations | §9, §19 |
+| SR-03 | Authentication (users, sessions, login, pairing codes) | §5.1 |
+| SR-04 | Authorization and consent | §5.2 |
+| SR-05 | Confirmation pipeline (pending actions, confirm endpoint) | §4, §5.3 |
+| SR-06 | Mock healthcare provider + demo data | §6.2, §6.12 |
+| SR-07 | Reminder worker + notifications | §6.3, §6.4 |
+| SR-08 | Conversation controller + AI tool calling | §4, §6.6 |
+
+More SR items are added as later sprints are planned (for example, the voice pipeline and the emergency guardrail in Sprint 3).
+
 ### Out of scope (say this explicitly in reports)
 - Real integrations with Epic/Cerner (FHIR), pharmacies, rideshare, airlines, or payments. These need health-system partnerships, security reviews, and contracts. **We use mock adapters shaped like the real APIs.**
 - Medical advice, diagnosis, or clinical emergency detection beyond a basic "call 911" safety guardrail.
@@ -871,18 +886,19 @@ The six features in scope (all except PB-05) are split **three per sprint**. The
 | | Week 13 · Nov 9 – Nov 15 | none new | **Demo preparation:** demo script and seed data, usability test with at least one older adult, small fixes from it, rehearsal. Stretch goals if everything is done. | Demo rehearsed |
 | Demos | Weeks 14–17 · Nov 16 – Dec 13 | none new | Project demos. Bug fixes only. | Final demo |
 
-### Suggested owners
-Confirm in the Sprint Backlog.
+### Owners
+Sprint 2 owners match the **Sprint 2 Backlog** tab in the team spreadsheet (S2-01 to S2-17). Sprint 3 owners are suggestions until Sprint 3 planning.
 
 | Person | Sprint 2 | Sprint 3 |
 |---|---|---|
-| Zohreh (backend) | Command pipeline + confirm endpoint; **PB-01** booking; **PB-02** appointment reminders, including the shared reminder worker | **PB-07** messaging (a Command) + emergency guardrail; cancel and reschedule |
-| Amarjargal (backend) | Auth + users (first, everyone needs it); mock provider + seed data; **PB-03** medication tables and schedules, plugged into the reminder worker | **PB-04** refills (a Command); **PB-06** human assistance backend |
+| Zohreh (backend) | FastAPI migration and database setup; auth + users (first, everyone needs it); authorization and consent; mock provider + seed data; **PB-03** medication tables and schedules, plugged into the reminder worker | **PB-07** messaging (a Command) + emergency guardrail |
+| Amarjargal (backend) | Command pipeline + confirm endpoint; **PB-01** booking; **PB-02** appointment reminders, including the shared reminder worker | **PB-04** refills (a Command); **PB-06** human assistance backend; cancel and reschedule (booking owner) |
 | Kunj (AI/voice) | Conversation controller + tool calling for PB-01–03; Whisper and TTS working on their own | Voice pipeline for every feature; tools for PB-04, PB-06, PB-07; guardrail AI check |
 | Moebius (frontend) | Conversation screen, confirmation card, reminder banner with taken/missed buttons | Microphone and audio playback, help button, support-agent queue, message and refill status screens |
 
 ### What this depends on
-- **Sprint 2 is the heavier sprint**, because it carries the foundation as well as three features. The foundation pieces (auth, the Command pipeline, the reminder worker) must be done early in Sprint 2, since all three of its features depend on them. Amarjargal starts with auth, and Zohreh with the Command pipeline, in the first days.
+- **Sprint 2 is the heavier sprint**, because it carries the foundation as well as three features. The foundation pieces (auth, the Command pipeline, the reminder worker) must be done early in Sprint 2, since all three of its features depend on them. Zohreh starts with auth, and Amarjargal with the Command pipeline, in the first days.
+- **Zohreh's PB-03 needs Amarjargal's reminder worker.** Build the medication tables and schedules first, then plug them into the worker once it exists.
 - Sprint 3's features are lighter because each one reuses the pipeline, which balances the load across the two sprints.
 - `FAKE_AI=true` lets backend and frontend work without waiting for the voice pipeline.
 
@@ -902,8 +918,8 @@ Record any change to these dates or the cut order in the Decision Log (§23).
 
 ## 18. Current state and immediate actions
 
-**Sprint 2 progress (done locally by Zohreh; to be merged into `main` with a Pull Request):**
-- **Flask replaced by FastAPI.** `GET /api/health` keeps the same path, response, and port (5000), so the frontend works unchanged. The old file is kept as `legacy_flask_app.py` until the FastAPI version is verified, then deleted.
+**Sprint 2 progress (by Zohreh; pushed to the `zohreh` branch, pull request into `main` open):**
+- **Flask replaced by FastAPI.** `GET /api/health` keeps the same path, response, and port (5000), so the frontend works unchanged. The old Flask `app.py` is removed.
 - **MVC folder structure created** (§11): `controllers/`, `views/`, `model/`, `adapters/`, `workers/`, plus `alembic/`, `scripts/`, `tests/`.
 - **Libraries chosen and pinned** (§3): `requirements.txt` + `requirements-dev.txt`; ruff and pytest configured in `pyproject.toml`.
 - **Database set up for the first features:** entity models for providers, appointments, appointment reminders, and pending actions (§9); Alembic reads `DATABASE_URL` from `.env`; tests always use `voice_assistant_test`.
@@ -930,10 +946,10 @@ First backend steps (Sprint 2):
 6. Appointment booking end to end via text (`/ai/process`) **before** voice; appointment reminder rows created from the `AppointmentBooked` event.
 7. Tests for confirmation, idempotency, authorization, and reminder times across a daylight-saving change.
 
-**Backend split (Zohreh and Amarjargal):**
-- **Auth + users + consent** is the easier package: a well-known recipe with standard libraries. But it **blocks everything else** (every endpoint needs `users` and `get_current_user()`), and mistakes are security bugs. After auth, this person can take the mock provider and seed script.
-- **Pending actions + appointments + appointment reminders** is the harder package: our own design (Command pipeline), transactions and row locking for double-confirm, slot conflicts, time zones. It can start before the AI exists by calling `propose_booking()` directly in tests.
-- Give the harder package to whoever is more comfortable with database transactions. Agree on the `users` table first.
+**Backend split (Zohreh and Amarjargal), as assigned in the Sprint 2 Backlog:**
+- **Zohreh: auth + users + consent, mock provider + seed data, PB-03** (S2-01 to S2-07). Mostly well-known recipes with standard libraries. Auth **blocks everything else** (every endpoint needs `users` and `get_current_user()`), so it comes first, and mistakes are security bugs.
+- **Amarjargal: pending actions + appointments + reminder worker + PB-02** (S2-08 to S2-12). Our own design (Command pipeline), transactions and row locking for double-confirm, slot conflicts, time zones. It can start before the AI exists by calling `propose_booking()` directly in tests. The entity models for appointments, reminders, and pending actions already exist as a starting point.
+- Agree on the `users` table first.
 ---
 
 ## 19. Git and GitHub workflow
@@ -1067,7 +1083,7 @@ Don't silently change major decisions. Update this file and the backlog.
 | Sprint 1 | Docker not used | Not currently planned | Active |
 | Sprint 1 | Real healthcare integrations replaced by mock services | Real integrations need partnerships and contracts | Active |
 | Sprint 2 (proposed) | Single confirmation mechanism via `pending_actions` and `/actions/{id}/confirm` | Confirmation can't be bypassed; one pattern for all features | Proposed |
-| Sprint 2 | Migrate existing Flask health check to FastAPI | Matches documented stack | Done locally; merge via PR |
+| Sprint 2 | Migrate existing Flask health check to FastAPI | Matches documented stack | Done; pull request open |
 | Sprint 2 (proposed) | MVC structure: `controllers/`, `views/`, `model/`, `adapters/` (replaces `routes/`, `ai/`) | Clear layer responsibilities; matches course requirement for MVC | Proposed |
 | Sprint 2 (proposed) | Conversation orchestrator lives in the controller tier and can only propose | Makes "AI never executes" structural | Proposed |
 | Sprint 2 (proposed) | Pending actions implemented with the Command pattern + `ActionService.confirm()` template method | One confirmation path; undo; adding a feature = adding a class | Proposed |
@@ -1153,7 +1169,7 @@ Don't commit real secrets, private health information, or unnecessary generated 
 - [ ] Sprint tracking spreadsheet available to all members
 - [x] React/FastAPI/PostgreSQL stack confirmed
 - [x] External AI provider selected (OpenAI)
-- [x] Existing Flask code migrated to FastAPI (locally; merge via PR)
+- [x] Existing Flask code migrated to FastAPI (pull request open)
 - [x] Development environment instructions documented (including local PostgreSQL)
 - [x] `.gitignore` configured
 - [ ] Secret-management approach agreed (`.env` + `.env.example` added; team to confirm)
