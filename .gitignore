@@ -1,1 +1,14 @@
 _notes.txt
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor settings
+.vscode/
+.idea/
+
+# Secrets: never commit real environment files
+.env
+.env.*
+!.env.example
