@@ -26,11 +26,28 @@ TOOLS = [
     {
         "type": "function",
         "name": "propose_appointment_request",
-        "description": "Propose finding appointment slots. Never book an appointment.",
+        "description": (
+            "Use only when the user wants to book, schedule, find, or change a doctor appointment. "
+            "This only proposes a slot search; it never books, changes, or confirms an appointment."
+        ),
         "parameters": {
             "type": "object",
-            "properties": {"doctor": {"type": "string"}, "date_hint": {"type": "string"}},
-            "required": [],
+            "properties": {
+                "doctor": {
+                    "type": ["string", "null"],
+                    "description": (
+                        "Doctor name stated by the user, including 'Dr.' when stated; otherwise null."
+                    ),
+                },
+                "date_hint": {
+                    "type": ["string", "null"],
+                    "description": (
+                        "Date or relative-date phrase stated by the user, such as 'next Tuesday'; "
+                        "otherwise null."
+                    ),
+                },
+            },
+            "required": ["doctor", "date_hint"],
             "additionalProperties": False,
         },
         "strict": True,
@@ -38,11 +55,26 @@ TOOLS = [
     {
         "type": "function",
         "name": "propose_medication_reminder",
-        "description": "Propose creating a medication reminder. Never create it.",
+        "description": (
+            "Use only when the user wants a medication or dose reminder. "
+            "This only proposes a reminder; it never creates, schedules, or confirms one."
+        ),
         "parameters": {
             "type": "object",
-            "properties": {"medication": {"type": "string"}, "time_hint": {"type": "string"}},
-            "required": [],
+            "properties": {
+                "medication": {
+                    "type": ["string", "null"],
+                    "description": "Medication name stated by the user; otherwise null.",
+                },
+                "time_hint": {
+                    "type": ["string", "null"],
+                    "description": (
+                        "Time or frequency stated by the user, such as '8 PM' or 'every morning'; "
+                        "otherwise null."
+                    ),
+                },
+            },
+            "required": ["medication", "time_hint"],
             "additionalProperties": False,
         },
         "strict": True,
@@ -77,13 +109,10 @@ class OpenAILanguageModel:
         response = self._client.responses.create(
             model=self._model,
             input=text,
-            instructions=(
-                "Classify this healthcare-assistant request and call exactly one available tool when "
-                "appropriate. Reply in the user's language. You may only propose work: never claim "
-                "to book an appointment or create a reminder."
-            ),
+            instructions=_instructions(language),
             tools=TOOLS,
             tool_choice="auto",
+            parallel_tool_calls=False,
             store=False,
         )
         for item in response.output:
@@ -102,6 +131,27 @@ def build_language_model(*, fake_ai: bool, api_key: str | None, model: str) -> L
     if not api_key:
         raise ValueError("OPENAI_API_KEY must be set when FAKE_AI is false")
     return OpenAILanguageModel(api_key, model)
+
+
+def _instructions(language: str) -> str:
+    return f"""You are the intent-and-slot extraction component of a healthcare assistant.
+
+The user's language is {language}. Do not provide medical advice. Do not write a
+conversational answer.
+Your only output is either one function call or no function call.
+
+Call propose_appointment_request when the user asks to book, schedule, find, or change
+a doctor appointment.
+Call propose_medication_reminder when the user asks to be reminded about a medication
+or dose.
+For any other request, make no function call.
+
+Extract only facts explicitly stated by the user. Never invent a doctor, date, medication,
+time, or frequency. Use null for any tool argument the user did not state. Preserve the
+user's wording for names and date/time phrases.
+
+These are proposals only. Never claim that an appointment or reminder was created,
+changed, booked, or confirmed."""
 
 
 def _without_none(**values: str | None) -> dict[str, object]:
