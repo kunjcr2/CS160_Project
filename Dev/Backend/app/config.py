@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     fake_ai: bool = True
     openai_api_key: str | None = None
     openai_model: str = "gpt-5.5"
+    openai_stt_model: str = "gpt-4o-mini-transcribe"
+    openai_tts_model: str = "gpt-4o-mini-tts"
+    openai_tts_voice: str = "alloy"
 
     # Auth (used once auth is implemented).
     jwt_secret: str = "change-me-in-dotenv"
