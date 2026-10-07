@@ -42,3 +42,12 @@ PS C:\Users\kunjs\Downloads\Projects\CS160_Project> @'
 >>   --data-binary "@-"
 {"reply":"Sorry, I didn't understand. Could you say that another way?","proposal":null}
 ```
+
+```powershell
+PS C:\Users\kunjs\Downloads\Projects\CS160_Project> @'
+>> {"text":"User: Set a reminder for my blood pressure medicine every morning. \nAssistant: I can help set a medication reminder. What medicine and what time should I use?\n User: Morning 8 and Dolo.","language":"en"}
+>> '@ | curl.exe -X POST "http://127.0.0.1:5000/api/v1/ai/process" `
+>>   -H "Content-Type: application/json" `
+>>   --data-binary "@-"
+{"reply":"I can help set a medication reminder. What medicine and what time should I use?","proposal":{"kind":"medication_reminder","medication":"Dolo","time_hint":"every morning; Morning 8"}}
+```
