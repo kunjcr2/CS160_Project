@@ -1,0 +1,128 @@
+"""Language-model adapters used only by the conversation controller.
+
+Adapters return a requested tool name and JSON-shaped arguments.  They never
+execute a tool or access the database.
+"""
+
+import json
+import re
+from dataclasses import dataclass
+from typing import Protocol
+
+from openai import OpenAI
+
+
+@dataclass(frozen=True)
+class ToolCall:
+    name: str
+    arguments: dict[str, object]
+
+
+class LanguageModel(Protocol):
+    def choose_tool(self, text: str, language: str) -> ToolCall | None: ...
+
+
+TOOLS = [
+    {
+        "type": "function",
+        "name": "propose_appointment_request",
+        "description": "Propose finding appointment slots. Never book an appointment.",
+        "parameters": {
+            "type": "object",
+            "properties": {"doctor": {"type": "string"}, "date_hint": {"type": "string"}},
+            "required": [],
+            "additionalProperties": False,
+        },
+        "strict": True,
+    },
+    {
+        "type": "function",
+        "name": "propose_medication_reminder",
+        "description": "Propose creating a medication reminder. Never create it.",
+        "parameters": {
+            "type": "object",
+            "properties": {"medication": {"type": "string"}, "time_hint": {"type": "string"}},
+            "required": [],
+            "additionalProperties": False,
+        },
+        "strict": True,
+    },
+]
+
+
+class FakeLanguageModel:
+    """Deterministic local stand-in for tests and development without an API key."""
+
+    def choose_tool(self, text: str, language: str) -> ToolCall | None:
+        normalized = text.lower()
+        if any(word in normalized for word in ("appointment", "doctor", "schedule", "book")):
+            doctor = _doctor_from(text)
+            date_hint = _date_hint_from(text)
+            return ToolCall("propose_appointment_request", _without_none(doctor=doctor, date_hint=date_hint))
+        if any(word in normalized for word in ("medication", "medicine", "pill", "dose", "remind")):
+            medication = _medication_from(text)
+            time_hint = _time_hint_from(text)
+            return ToolCall(
+                "propose_medication_reminder", _without_none(medication=medication, time_hint=time_hint)
+            )
+        return None
+
+
+class OpenAILanguageModel:
+    def __init__(self, api_key: str, model: str) -> None:
+        self._client = OpenAI(api_key=api_key)
+        self._model = model
+
+    def choose_tool(self, text: str, language: str) -> ToolCall | None:
+        response = self._client.responses.create(
+            model=self._model,
+            input=text,
+            instructions=(
+                "Classify this healthcare-assistant request and call exactly one available tool when "
+                "appropriate. Reply in the user's language. You may only propose work: never claim "
+                "to book an appointment or create a reminder."
+            ),
+            tools=TOOLS,
+            tool_choice="auto",
+            store=False,
+        )
+        for item in response.output:
+            if item.type == "function_call":
+                try:
+                    arguments = json.loads(item.arguments)
+                except json.JSONDecodeError:
+                    return None
+                return ToolCall(item.name, arguments)
+        return None
+
+
+def build_language_model(*, fake_ai: bool, api_key: str | None, model: str) -> LanguageModel:
+    if fake_ai:
+        return FakeLanguageModel()
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY must be set when FAKE_AI is false")
+    return OpenAILanguageModel(api_key, model)
+
+
+def _without_none(**values: str | None) -> dict[str, object]:
+    return {key: value for key, value in values.items() if value is not None}
+
+
+def _doctor_from(text: str) -> str | None:
+    match = re.search(r"\b(?:dr\.?|doctor)\s+([A-Z][a-z]+)", text, re.I)
+    return f"Dr. {match.group(1)}" if match else None
+
+
+def _date_hint_from(text: str) -> str | None:
+    match = re.search(r"\b(today|tomorrow|next\s+(?:monday|tuesday|wednesday|thursday|friday|week))\b", text, re.I)
+    return match.group(1).lower() if match else None
+
+
+def _medication_from(text: str) -> str | None:
+    match = re.search(r"(?:for|about|my)\s+([A-Za-z][A-Za-z -]{1,40}?)(?:\s+(?:at|every|reminder|medicine|medication|pill)|[?.!]|$)", text, re.I)
+    return match.group(1).strip() if match else None
+
+
+def _time_hint_from(text: str) -> str | None:
+    match = re.search(r"\b(?:at\s+)?(\d{1,2}(?::\d{2})?\s*(?:a\.m\.|p\.m\.|am|pm)|morning|evening|night)\b", text, re.I)
+    return match.group(1).lower() if match else None

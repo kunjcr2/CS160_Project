@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.controllers import health
+from app.controllers.conversation.endpoints import router as conversation_router
 
 
 def create_app() -> FastAPI:
@@ -24,8 +25,12 @@ def create_app() -> FastAPI:
     # Kept at /api/health so the existing frontend keeps working.
     # Feature routers go under /api/v1.
     app.include_router(health.router, prefix="/api")
+    app.include_router(conversation_router, prefix="/api/v1")
 
     return app
 
 
 app = create_app()
+
+# Public application entry point for other servers and imports.
+__all__ = ["app", "create_app"]

@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     # AI: FAKE_AI=true returns canned responses, so tests and UI work need no key (plan §6.10).
     fake_ai: bool = True
     openai_api_key: str | None = None
+    openai_model: str = "gpt-5.5"
 
     # Auth (used once auth is implemented).
     jwt_secret: str = "change-me-in-dotenv"
