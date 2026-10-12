@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pydantic import ValidationError
 
 from app.adapters.llm.client import LanguageModel
-from app.controllers.conversation.tools import Proposal, proposal_from_tool_call
+from app.controllers.conversation.tools import Proposal, proposal_from_json
 from app.views import messages
 
 
@@ -21,12 +21,11 @@ class ConversationOrchestrator:
 
     def process(self, text: str, language: str) -> ConversationResult:
         try:
-            proposal = proposal_from_tool_call(self._language_model.choose_tool(text, language))
+            model_response = self._language_model.respond(text, language)
+            proposal = proposal_from_json(model_response.proposal)
         except (ValidationError, ValueError, TypeError):
-            proposal = None
+            return ConversationResult(reply=messages.NOT_UNDERSTOOD, proposal=None)
 
         if proposal is None:
-            return ConversationResult(reply=messages.NOT_UNDERSTOOD, proposal=None)
-        if proposal.kind == "appointment":
-            return ConversationResult(reply=messages.APPOINTMENT_REQUEST_RECEIVED, proposal=proposal)
-        return ConversationResult(reply=messages.MEDICATION_REQUEST_RECEIVED, proposal=proposal)
+            return ConversationResult(reply=model_response.reply, proposal=None)
+        return ConversationResult(reply=model_response.reply, proposal=proposal)

@@ -33,7 +33,7 @@ class OpenAISpeechToText:
         self._client = OpenAI(api_key=api_key)
         self._model = model
 
-    def transcribe(self, audio: bytes, filename: str, content_type: str | None = None) -> str:
+    def transcribe(self, audio: bytes, filename: str) -> str:
         if not audio:
             raise ValueError("Audio file is empty")
         file_object = BytesIO(audio)

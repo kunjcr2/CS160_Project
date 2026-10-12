@@ -4,8 +4,6 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.adapters.llm.client import ToolCall
-
 
 class AppointmentProposal(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -26,13 +24,11 @@ class MedicationReminderProposal(BaseModel):
 Proposal = Annotated[AppointmentProposal | MedicationReminderProposal, Field(discriminator="kind")]
 
 
-def proposal_from_tool_call(call: ToolCall | None) -> Proposal | None:
-    if call is None:
+def proposal_from_json(proposal: dict[str, object] | None) -> Proposal | None:
+    if proposal is None:
         return None
-    if call.name == "propose_appointment_request":
-        return AppointmentProposal.model_validate({"kind": "appointment", **call.arguments})
-    if call.name == "propose_medication_reminder":
-        return MedicationReminderProposal.model_validate(
-            {"kind": "medication_reminder", **call.arguments}
-        )
+    if proposal.get("kind") == "appointment":
+        return AppointmentProposal.model_validate(proposal)
+    if proposal.get("kind") == "medication_reminder":
+        return MedicationReminderProposal.model_validate(proposal)
     return None

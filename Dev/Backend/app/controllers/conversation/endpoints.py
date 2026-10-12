@@ -28,9 +28,10 @@ class ProcessResponse(BaseModel):
 def get_language_model() -> LanguageModel:
     try:
         return build_language_model(
-            fake_ai=settings.fake_ai,
             api_key=settings.openai_api_key,
             model=settings.openai_model,
+            reasoning_effort=settings.openai_reasoning_effort,
+            max_output_tokens=settings.openai_max_output_tokens,
         )
     except ValueError as error:
         raise HTTPException(status_code=503, detail=messages.AI_UNAVAILABLE) from error
