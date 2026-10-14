@@ -643,7 +643,7 @@ All under `/api/v1`. All except auth and health require a valid access token. Ex
 | Users / profile | `GET /users/me` · `PATCH /users/me` |
 | Consent | `GET /consents` · `POST /consents` · `DELETE /consents/{id}` |
 | AI / conversation | `POST /ai/process` (text in → reply, optional pending action) · `POST /ai/voice` (audio in → transcript, reply text, reply audio, optional pending action) · `POST /ai/tts` |
-| Actions (confirmation) | `GET /actions/pending` · `POST /actions/{id}/confirm` · `POST /actions/{id}/cancel` · `POST /actions/{id}/undo` |
+| Actions (confirmation) | `POST /actions` (propose only, for the frontend and manual tests without the AI; never executes) · `GET /actions/pending` · `POST /actions/{id}/confirm` · `POST /actions/{id}/cancel` · `POST /actions/{id}/undo` |
 | Appointments | `GET /providers` · `GET /slots?provider_id&from&to` · `GET /appointments` · `GET /appointments/{id}` · *(create/cancel/reschedule via actions)* |
 | Appointment reminders | `GET /appointment-reminders` · `PATCH /appointment-reminders/settings` |
 | Medications | `GET /medications` · `GET /medication-reminders?date=` · `POST /medication-reminders/{id}/taken` |
