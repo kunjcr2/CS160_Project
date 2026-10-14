@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.controllers import actions, health
+from app.controllers import actions, appointments, health
 
 
 def create_app() -> FastAPI:
@@ -25,6 +25,7 @@ def create_app() -> FastAPI:
     # Feature routers go under /api/v1.
     app.include_router(health.router, prefix="/api")
     app.include_router(actions.router, prefix="/api/v1")
+    app.include_router(appointments.router, prefix="/api/v1")
 
     return app
 
