@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     # Auth (used once auth is implemented).
     jwt_secret: str = "change-me-in-dotenv"
     access_token_minutes: int = 15
+    # TEMPORARY, local development only, until auth (S2-03): trust an X-User-Id header.
+    dev_user_header: bool = False
+
+    # Confirmation (plan §5.3): how long a proposed action waits for a yes.
+    pending_action_ttl_minutes: int = 5
 
 
 settings = Settings()
