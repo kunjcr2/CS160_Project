@@ -645,12 +645,12 @@ All under `/api/v1`. All except auth and health require a valid access token. Ex
 | AI / conversation | `POST /ai/process` (text in → reply, optional pending action) · `POST /ai/voice` (audio in → transcript, reply text, reply audio, optional pending action) · `POST /ai/tts` |
 | Actions (confirmation) | `POST /actions` (propose only, for the frontend and manual tests without the AI; never executes) · `GET /actions/pending` · `POST /actions/{id}/confirm` · `POST /actions/{id}/cancel` · `POST /actions/{id}/undo` |
 | Appointments | `GET /providers` · `GET /slots?provider_id&from&to` · `GET /appointments` · `GET /appointments/{id}` · *(create/cancel/reschedule via actions)* |
-| Appointment reminders | `GET /appointment-reminders` · `PATCH /appointment-reminders/settings` |
+| Appointment reminders | `POST /appointment-reminders/{id}/acknowledge` (OK button) · `GET /appointment-reminders` · `PATCH /appointment-reminders/settings` |
 | Medications | `GET /medications` · `GET /medication-reminders?date=` · `POST /medication-reminders/{id}/taken` |
 | Refills | `GET /refills` · *(create via actions)* |
 | Messages | `GET /messages` · `GET /messages/{threadId}` · *(send via actions)* |
 | Assistance (handoff) | `POST /assistance` · `GET /assistance/queue` (agent) · `PATCH /assistance/{id}` (agent) |
-| Notifications | `GET /notifications` or `GET /notifications/stream` (SSE) · `POST /notifications/{id}/ack` |
+| Notifications | `GET /notifications` (polled every 15–30 s; reminders of every kind due in the last 12 hours, with current status) |
 
 Two rules:
 - **State-changing operations on the outside world are not exposed directly.** They go through `/actions` so confirmation can't be bypassed. (This replaces per-resource confirm routes like `/appointments/{id}/confirm`: one confirmation mechanism for every feature.)
@@ -1055,7 +1055,7 @@ Record these in the Decision Log (§23) once decided:
 - [x] ORM vs. direct SQL: SQLAlchemy 2.1 (§3)
 - [x] Database migration tool: Alembic (§3)
 - [ ] Authentication details: pairing-code flow for older adults? token lifetimes?
-- [ ] Reminder delivery: polling, SSE, or Web Push
+- [x] Reminder delivery: polling for Sprint 2 (§23)
 - [x] Scheduler: DB-polling worker (§6.3)
 - [ ] Exact behavior used to simulate human handoff (support-agent queue, caregiver call, or both)
 - [ ] OpenAI model choices and per-user request limits
@@ -1095,6 +1095,7 @@ Don't silently change major decisions. Update this file and the backlog.
 | Sprint 2 (proposed) | **PB-05 multilingual becomes a stretch goal**; English only first, designed to grow (§6.8) | Largest item (13 pts), touches every feature, lowest top-3 ranking; limited time | Proposed: needs team agreement (incl. Kunj) |
 | Sprint 2 | **Application finished by end of week 12 (Nov 8)**: all features except PB-05, implemented and debugged; feature freeze Nov 4; week 13 for demo preparation (§17) | Course has three implementation sprints left; leaves a buffer week before demos | Active |
 | Sprint 2 | User-facing backend text in one file, `views/messages.py` (replaces planned `views/i18n/`) | No translations needed now; one place to reword after usability tests and to translate later | Active |
+| Sprint 2 | **Reminder delivery by polling**: the frontend calls `GET /notifications` every 15–30 s while the app is open; the backend worker owns reminder timing and status (§6.3, §6.4) | The worker only runs every ~30 s, so pushing gains little; the browser's `EventSource` can't send the `Authorization` header; least to build. SSE or Web Push can come later | Active |
 
 Add rows whenever a major project decision changes.
 
