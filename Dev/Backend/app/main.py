@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.adapters.healthcare.interface import HealthcareProvider
 from app.adapters.healthcare.mock import MockHealthcareProvider
 from app.config import settings
-from app.controllers import auth, consents, health, older_adults, users
+from app.controllers import auth, consents, health, medications, older_adults, users
 
 
 def build_healthcare_provider() -> HealthcareProvider:
@@ -44,6 +44,7 @@ def create_app() -> FastAPI:
     app.include_router(users.router, prefix="/api/v1")
     app.include_router(older_adults.router, prefix="/api/v1")
     app.include_router(consents.router, prefix="/api/v1")
+    app.include_router(medications.router, prefix="/api/v1")
 
     return app
 
