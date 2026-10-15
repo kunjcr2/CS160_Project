@@ -19,11 +19,12 @@ from sqlalchemy.orm import Mapped, mapped_column
 # status_check: helper that builds the rule "this column must be one of these words".
 from .base import Base, IdTimestampMixin, status_check
 
-# The only roles allowed (plan §5.2). Kept in one place so code and tests can reuse it.
+# The only roles allowed. Kept in one place so code and tests can reuse it.
 ROLES = ("older_adult", "caregiver", "support_agent", "admin")
 
 
 class User(IdTimestampMixin, Base):
+    """A person who uses the system: an older adult, caregiver, support agent, or admin."""
     # The table's name inside PostgreSQL.
     __tablename__ = "users"
 
