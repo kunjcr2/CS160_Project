@@ -640,7 +640,7 @@ All under `/api/v1`. All except auth and health require a valid access token. Ex
 |---|---|
 | Health | `GET /health` |
 | Auth | `POST /auth/register` (caregiver) · `POST /auth/login` · `POST /auth/refresh` · `POST /auth/logout` · `POST /auth/pairing-codes` · `POST /auth/pair` |
-| Users / profile | `GET /users/me` · `PATCH /users/me` |
+| Users / profile | `GET /users/me` · `PATCH /users/me` · `POST /older-adults` (caregiver creates an older adult profile + a consent grant with `profile:manage`) |
 | Consent | `GET /consents` · `POST /consents` · `DELETE /consents/{id}` |
 | AI / conversation | `POST /ai/process` (text in → reply, optional pending action) · `POST /ai/voice` (audio in → transcript, reply text, reply audio, optional pending action) · `POST /ai/tts` |
 | Actions (confirmation) | `GET /actions/pending` · `POST /actions/{id}/confirm` · `POST /actions/{id}/cancel` · `POST /actions/{id}/undo` |
