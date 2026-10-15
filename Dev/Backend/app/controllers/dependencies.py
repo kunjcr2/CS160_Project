@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from app.db import get_session
 from app.model.entities import User
+from app.model.permissions import can_access
 from app.model.security import decode_access_token
 
 # Reads the "Authorization: Bearer <token>" header. auto_error=False: we send our own 401.
@@ -46,3 +47,19 @@ def get_current_user(
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+def require_access(scope: str):
+    """For routes with {older_adult_id} in the path. Not allowed → 404.
+
+    404, not 403: we don't even admit that the data exists (plan §5.2).
+    Usage:
+        owner_id: Annotated[uuid.UUID, Depends(require_access("appointments:read"))]
+    """
+
+    def check(older_adult_id: uuid.UUID, user: CurrentUser, db: Db) -> uuid.UUID:
+        if not can_access(db, user, older_adult_id, scope):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found.")
+        return older_adult_id
+
+    return check
