@@ -10,7 +10,7 @@ All datetimes are timezone-aware and in UTC.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 
 # ---------- Errors ----------
 # Each error means something different for the user, so callers can
@@ -52,6 +52,7 @@ class Practitioner:
 class Slot:
     """A free time with one practitioner (FHIR Slot). Never stored in our database."""
 
+    id: str  # see make_slot_id(); pass it back to book "option 2"
     practitioner_ref: str
     starts_at: datetime  # UTC
     ends_at: datetime  # UTC
@@ -66,6 +67,29 @@ class Booking:
     starts_at: datetime  # UTC
     ends_at: datetime  # UTC
     location: str
+
+
+# ---------- Slot ids ----------
+# A slot id is "<practitioner_ref>|<start in UTC as YYYYMMDDTHHMMZ>", for example
+# "mock-prac-cardiology-1|20261019T1600Z". The AI or the screen can pass it back to book
+# that slot:  office.book(*parse_slot_id(slot_id), patient_ref)
+# Same format as Amar's booking code, so his payloads keep working.
+
+
+def make_slot_id(practitioner_ref: str, starts_at: datetime) -> str:
+    """Build the id of the slot that starts at starts_at with this practitioner."""
+    return f"{practitioner_ref}|{starts_at.astimezone(UTC):%Y%m%dT%H%MZ}"
+
+
+def parse_slot_id(slot_id: str) -> tuple[str, datetime]:
+    """Split a slot id into (practitioner_ref, starts_at in UTC).
+
+    Raises ValueError if the text is not a slot id.
+    """
+    practitioner_ref, _, stamp = slot_id.rpartition("|")
+    if not practitioner_ref:
+        raise ValueError(f"Not a slot id: {slot_id!r}")
+    return practitioner_ref, datetime.strptime(stamp, "%Y%m%dT%H%MZ").replace(tzinfo=UTC)
 
 
 # ---------- The interface ----------

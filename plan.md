@@ -386,7 +386,7 @@ Shape the mock data after real FHIR resources so the engineering is credible:
 `Practitioner`, `Slot`, `Appointment`, `MedicationRequest`, `Communication`.
 - Add realistic **latency** and **random failures** (configurable). Our error paths need something to test against.
 - Put it behind an interface (`HealthcareProvider`) in `app/adapters/healthcare/`, with `MockHealthcareProvider` as the only implementation for now.
-- **Built (S2-05):** `interface.py` + `mock.py`. 3 fake doctors; slots Mon–Fri 9:00–17:00 Pacific, 30 min, no lunch slots; bookings in memory. Settings: `MOCK_PROVIDER_LATENCY_MS`, `MOCK_PROVIDER_FAILURE_RATE` (both off by default). `main.py` builds one shared instance; endpoints get it with the `Healthcare` dependency.
+- **Built (S2-05):** `interface.py` + `mock.py`. 3 fake doctors; slots Mon–Fri 9:00–17:00 Pacific, 30 min, no lunch slots; each slot has an id (`<doctor>|YYYYMMDDTHHMMZ`, read with `parse_slot_id`); about 1 in 4 slots are already taken by other patients (stable hash, same every run); bookings in memory. Settings: `MOCK_PROVIDER_LATENCY_MS`, `MOCK_PROVIDER_FAILURE_RATE` (both off by default). `main.py` builds one shared instance; endpoints get it with the `Healthcare` dependency.
 
 ### 6.3 Scheduler / background worker (needed by PB-02 and PB-03)
 Reminders must fire even when nobody is making a request. Recommended simple, robust design:
@@ -1097,6 +1097,7 @@ Don't silently change major decisions. Update this file and the backlog.
 | Sprint 2 (proposed) | **PB-05 multilingual becomes a stretch goal**; English only first, designed to grow (§6.8) | Largest item (13 pts), touches every feature, lowest top-3 ranking; limited time | Proposed: needs team agreement (incl. Kunj) |
 | Sprint 2 | **Application finished by end of week 12 (Nov 8)**: all features except PB-05, implemented and debugged; feature freeze Nov 4; week 13 for demo preparation (§17) | Course has three implementation sprints left; leaves a buffer week before demos | Active |
 | Sprint 2 | User-facing backend text in one file, `views/messages.py` (replaces planned `views/i18n/`) | No translations needed now; one place to reword after usability tests and to translate later | Active |
+| Sprint 2 (Oct 15) | **One mock provider:** keep Zohreh's S2-05 `HealthcareProvider` / `MockHealthcareProvider` as the base, plus Amar's slot id and pre-taken slots; Amar's booking code switches to it | Avoids two competing mocks; settings from `.env`, injected with `Depends`, doctor list for the seed, own tests; Amar's ideas make the demo realistic | Agreed (Zohreh + Amar) |
 
 Add rows whenever a major project decision changes.
 

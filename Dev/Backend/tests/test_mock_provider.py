@@ -8,6 +8,7 @@ from app.adapters.healthcare.interface import (
     BookingNotFoundError,
     ProviderUnavailableError,
     SlotUnavailableError,
+    parse_slot_id,
 )
 from app.adapters.healthcare.mock import OFFICE_TZ, MockHealthcareProvider
 
@@ -26,6 +27,13 @@ MONDAY = (local(10, 19, 0), local(10, 20, 0))  # all of Monday, Oct 19
 
 @pytest.fixture
 def office() -> MockHealthcareProvider:
+    """An office where every slot starts free, so the numbers below are exact."""
+    return MockHealthcareProvider(now=lambda: NOW, pre_taken_slots=False)
+
+
+@pytest.fixture
+def busy_office() -> MockHealthcareProvider:
+    """The normal office: about 1 in 4 slots already taken by other patients."""
     return MockHealthcareProvider(now=lambda: NOW)
 
 
@@ -59,7 +67,7 @@ def test_no_slots_on_weekend(office):
 
 
 def test_past_slots_are_hidden():
-    office = MockHealthcareProvider(now=lambda: local(10, 19, 10))  # Monday 10:00
+    office = MockHealthcareProvider(now=lambda: local(10, 19, 10), pre_taken_slots=False)
     slots = office.find_slots(CARDIO, *MONDAY)
     assert slots[0].starts_at == local(10, 19, 10, 30)
 
@@ -74,6 +82,57 @@ def test_unknown_doctor(office):
     assert office.find_slots("no-such-doctor", *MONDAY) == []
     with pytest.raises(SlotUnavailableError):
         office.book("no-such-doctor", local(10, 19, 9), "user-1")
+
+
+# ---------- Slot ids ----------
+
+
+def test_every_slot_has_an_id_that_reads_back(office):
+    slot = office.find_slots(CARDIO, *MONDAY)[0]
+    assert slot.id == "mock-prac-cardiology-1|20261019T1600Z"  # 9:00 PDT = 16:00 UTC
+    assert parse_slot_id(slot.id) == (CARDIO, slot.starts_at)
+
+
+def test_book_with_a_slot_id(office):
+    slot = office.find_slots(CARDIO, *MONDAY)[3]
+    booking = office.book(*parse_slot_id(slot.id), "user-1")
+    assert booking.starts_at == slot.starts_at
+    assert booking.practitioner_ref == CARDIO
+
+
+@pytest.mark.parametrize(
+    "bad_id",
+    ["", "no-separator", "mock-prac-cardiology-1|not-a-time", "|20261019T1600Z"],
+)
+def test_bad_slot_id_is_refused(bad_id):
+    with pytest.raises(ValueError):
+        parse_slot_id(bad_id)
+
+
+# ---------- Slots taken by other patients ----------
+
+
+def test_about_a_quarter_of_slots_are_taken(office, busy_office):
+    four_weeks = (local(10, 19, 0), local(11, 16, 0))
+    all_slots = office.find_slots(CARDIO, *four_weeks)
+    free = busy_office.find_slots(CARDIO, *four_weeks)
+    taken_share = 1 - len(free) / len(all_slots)
+    assert 0.15 < taken_share < 0.35
+
+
+def test_taken_slots_are_the_same_every_time():
+    first = MockHealthcareProvider(now=lambda: NOW).find_slots(CARDIO, *MONDAY)
+    second = MockHealthcareProvider(now=lambda: NOW).find_slots(CARDIO, *MONDAY)
+    assert [s.id for s in first] == [s.id for s in second]
+
+
+def test_taken_slot_cannot_be_booked(office, busy_office):
+    week = (local(10, 19, 0), local(10, 24, 0))
+    free_ids = {s.id for s in busy_office.find_slots(CARDIO, *week)}
+    taken = [s for s in office.find_slots(CARDIO, *week) if s.id not in free_ids]
+    assert taken  # this week has at least one taken slot
+    with pytest.raises(SlotUnavailableError):
+        busy_office.book(CARDIO, taken[0].starts_at, "user-1")
 
 
 # ---------- Booking and cancelling ----------

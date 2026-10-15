@@ -6,6 +6,10 @@
   30 minutes each, no slots during lunch (12:00-13:00).
 - Bookings live in memory only and disappear when the server restarts. Our own
   appointments table is the real record (its unique index still blocks double-booking).
+- About 1 in 4 slots are "already taken" by other patients (more realistic demo). They
+  are chosen by a stable hash, so the same slots are taken on every run. Tests can turn
+  this off with pre_taken_slots=False.
+- Every slot has an id (see make_slot_id), so the AI or the screen can pass it back.
 - Slow calls and random failures can be turned on to test error paths.
 
 Mock/demo data only. No real people, no real patients.
@@ -15,6 +19,7 @@ Error texts here are for developers; user-facing sentences live in views/message
 import random
 import threading
 import uuid
+import zlib
 from collections.abc import Callable, Iterator
 from datetime import UTC, datetime, time, timedelta
 from time import sleep
@@ -28,6 +33,7 @@ from .interface import (
     ProviderUnavailableError,
     Slot,
     SlotUnavailableError,
+    make_slot_id,
 )
 
 # ---------- Office hours ----------
@@ -98,9 +104,21 @@ def _office_slots(practitioner_ref: str, start: datetime, end: datetime) -> Iter
             starts_at = local.astimezone(UTC)
             ends_at = starts_at + SLOT_LENGTH
             if _is_office_slot(starts_at) and start <= starts_at and ends_at <= end:
-                yield Slot(practitioner_ref=practitioner_ref, starts_at=starts_at, ends_at=ends_at)
+                yield Slot(
+                    id=make_slot_id(practitioner_ref, starts_at),
+                    practitioner_ref=practitioner_ref,
+                    starts_at=starts_at,
+                    ends_at=ends_at,
+                )
             local += SLOT_LENGTH
         day += timedelta(days=1)
+
+
+def _taken_by_other_patients(practitioner_ref: str, starts_at: datetime) -> bool:
+    """True for about 1 in 4 slots. A stable hash (crc32), so the same slots are taken
+    on every run and every computer. Same rule as Amar's first mock."""
+    key = f"{practitioner_ref}{starts_at.astimezone(UTC):%Y%m%dT%H%M}"
+    return zlib.crc32(key.encode()) % 4 == 0
 
 
 class MockHealthcareProvider(HealthcareProvider):
@@ -112,6 +130,7 @@ class MockHealthcareProvider(HealthcareProvider):
         failure_rate: float = 0.0,
         seed: int | None = None,
         now: Callable[[], datetime] = _utc_now,
+        pre_taken_slots: bool = True,
     ) -> None:
         if not 0.0 <= failure_rate <= 1.0:
             raise ValueError("failure_rate must be between 0.0 and 1.0")
@@ -119,6 +138,7 @@ class MockHealthcareProvider(HealthcareProvider):
         self._failure_rate = failure_rate
         self._random = random.Random(seed)  # a seed makes failures repeatable in tests
         self._now = now  # tests can pass a fixed "now"
+        self._pre_taken_slots = pre_taken_slots  # False = every slot starts free (tests)
         self._practitioners = {p.external_ref: p for p in PRACTITIONERS}
         self._bookings: dict[str, Booking] = {}
         # FastAPI runs normal endpoints in several threads; the lock stops two
@@ -142,7 +162,9 @@ class MockHealthcareProvider(HealthcareProvider):
         return [
             slot
             for slot in _office_slots(practitioner_ref, start, end)
-            if slot.starts_at > now and slot.starts_at not in taken
+            if slot.starts_at > now
+            and slot.starts_at not in taken
+            and not self._is_taken_by_others(practitioner_ref, slot.starts_at)
         ]
 
     def book(self, practitioner_ref: str, starts_at: datetime, patient_ref: str) -> Booking:
@@ -152,6 +174,8 @@ class MockHealthcareProvider(HealthcareProvider):
         practitioner = self._practitioners.get(practitioner_ref)
         if practitioner is None or not _is_office_slot(starts_at) or starts_at <= self._now():
             raise SlotUnavailableError("No such slot.")
+        if self._is_taken_by_others(practitioner_ref, starts_at):
+            raise SlotUnavailableError("Slot already booked by another patient.")
         with self._lock:
             if starts_at in self._taken_starts(practitioner_ref):
                 raise SlotUnavailableError("Slot already booked.")
@@ -178,6 +202,9 @@ class MockHealthcareProvider(HealthcareProvider):
         return {
             b.starts_at for b in self._bookings.values() if b.practitioner_ref == practitioner_ref
         }
+
+    def _is_taken_by_others(self, practitioner_ref: str, starts_at: datetime) -> bool:
+        return self._pre_taken_slots and _taken_by_other_patients(practitioner_ref, starts_at)
 
     def _simulate_network(self) -> None:
         """Pretend to be a real remote system: maybe slow, maybe down."""
