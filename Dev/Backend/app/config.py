@@ -37,5 +37,10 @@ class Settings(BaseSettings):
     # PB-03: how many days of medication doses to create ahead of time.
     medication_days_ahead: int = 7
 
+    # PB-03: if a dose gets no answer, show it again after this many minutes...
+    medication_reprompt_minutes: int = 30
+    # ...and mark it "missed" after this many minutes (counted from when it was first shown).
+    medication_missed_minutes: int = 60
+
 
 settings = Settings()
