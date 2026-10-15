@@ -54,6 +54,16 @@ alembic revision --autogenerate -m "describe the change"
 alembic upgrade head
 ```
 
+## 3b. Add demo data (Margaret's story)
+
+```bash
+python -m scripts.seed
+```
+
+Creates 3 mock doctors, Margaret (older adult), her son Daniel (caregiver, `daniel.lee@example.com`), and a support agent (`riley.chen@example.com`). The demo password is `DEMO_PASSWORD` in `scripts/seed.py`. Safe to run many times. Mock data only, never real patients.
+
+The mock doctor's office can be made slow or broken for testing with `MOCK_PROVIDER_LATENCY_MS` and `MOCK_PROVIDER_FAILURE_RATE` in `.env` (see `.env.example`).
+
 ## 4. Run the server
 
 ```bash

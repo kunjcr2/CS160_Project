@@ -386,6 +386,7 @@ Shape the mock data after real FHIR resources so the engineering is credible:
 `Practitioner`, `Slot`, `Appointment`, `MedicationRequest`, `Communication`.
 - Add realistic **latency** and **random failures** (configurable). Our error paths need something to test against.
 - Put it behind an interface (`HealthcareProvider`) in `app/adapters/healthcare/`, with `MockHealthcareProvider` as the only implementation for now.
+- **Built (S2-05):** `interface.py` + `mock.py`. 3 fake doctors; slots Mon–Fri 9:00–17:00 Pacific, 30 min, no lunch slots; bookings in memory. Settings: `MOCK_PROVIDER_LATENCY_MS`, `MOCK_PROVIDER_FAILURE_RATE` (both off by default). `main.py` builds one shared instance; endpoints get it with the `Healthcare` dependency.
 
 ### 6.3 Scheduler / background worker (needed by PB-02 and PB-03)
 Reminders must fire even when nobody is making a request. Recommended simple, robust design:
@@ -469,6 +470,7 @@ Who did what, when: logins, consent grants, every pending-action transition, car
 
 ### 6.12 Seed / demo data
 Seed Margaret's story: her cardiologist and physical therapist, four medications (two twice daily), open slots next week, a pharmacy of record, a caregiver (her son), and a support agent. The demo then has a real narrative. Use only mock/demo health information, never real patient data.
+- **Built (S2-05):** `python -m scripts.seed` creates the providers, Margaret, her son (caregiver, all scopes), and a support agent. Safe to run many times. Medications and the pharmacy are added in S2-06.
 
 ### 6.13 Observability
 Health endpoint (already exists), structured logs with a request id, and **no health data or audio in logs** (log ids, not content).
@@ -712,7 +714,7 @@ Dev/Backend/app/
 ├── workers/
 │   └── reminder_worker.py   # polls due reminders, publishes ReminderDue
 ├── alembic/                 # migrations; versions/ files are named by date (exists)
-├── scripts/seed.py          # Margaret demo data (stub)
+├── scripts/seed.py          # Margaret demo data: python -m scripts.seed
 ├── tests/                   # conftest.py always uses voice_assistant_test (exists)
 ├── alembic.ini
 ├── pyproject.toml           # pytest + ruff settings
