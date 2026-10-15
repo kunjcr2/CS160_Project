@@ -20,5 +20,27 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me-in-dotenv"
     access_token_minutes: int = 15
 
+    # How long a signed-in device stays signed in without logging in again.
+    refresh_token_days: int = 90
+
+    # Cookie "Secure" flag: cookie sent only over https. False for local http; True in production.
+    cookie_secure: bool = False
+
+    # How long a pairing code works after it's created.
+    pairing_code_minutes: int = 15
+
+    # Mock doctor's office. 0 = fast and never fails (good for tests).
+    # Turn on in .env to test slow or broken provider paths.
+    mock_provider_latency_ms: int = 0
+    mock_provider_failure_rate: float = 0.0  # 0.0 to 1.0 (0.2 = 20% of calls fail)
+
+    # PB-03: how many days of medication doses to create ahead of time.
+    medication_days_ahead: int = 7
+
+    # PB-03: if a dose gets no answer, show it again after this many minutes...
+    medication_reprompt_minutes: int = 30
+    # ...and mark it "missed" after this many minutes (counted from when it was first shown).
+    medication_missed_minutes: int = 60
+
 
 settings = Settings()
