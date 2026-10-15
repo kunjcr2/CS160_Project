@@ -621,9 +621,9 @@ First tables built (Sprint 2, for PB-01 and PB-02): `providers`, `appointments`,
 | `providers` | name, specialty, location, phone, external_ref (unique) | Mirrors FHIR `Practitioner`. Time slots are **not** stored; they come from the mock provider. |
 | `appointments` | user_id, provider_id, starts_at, ends_at, location, status (`booked`/`cancelled`/`completed`), external_ref | Appointment. **No double-booking:** unique `(provider_id, starts_at) WHERE status = 'booked'`. |
 | `appointment_reminders` | appointment_id, user_id, kind (`day_before`/`morning_of`/`hour_before`), due_at, status (§6.3), attempts, sent_at | AppointmentReminder. Unique `(appointment_id, kind)` prevents duplicates; index on `due_at WHERE status = 'scheduled'` for the worker. |
-| `medications` | user_id, name, dosage, instructions, refills_remaining, pharmacy_contact_id | Medication |
-| `medication_schedules` | medication_id, time_of_day, days_of_week | Local times |
-| `medication_reminders` | schedule_id, due_at, status (§6.3), confirmed_at, attempts | MedicationReminder; polled by worker |
+| `medications` | user_id, name, dosage, instructions, refills_remaining (≥ 0), stopped_at | Medication. `pharmacy_contact_id` comes later with the contacts table (PB-04). `stopped_at` set = no new doses. |
+| `medication_schedules` | medication_id, time_of_day (local, no zone), days_of_week (smallint[], 0 = Mon … 6 = Sun) | Local times; the zone is `users.timezone`. At least one day; one row per medication + time. |
+| `medication_reminders` | schedule_id, user_id, due_at (UTC), status (§6.3), attempts, sent_at, confirmed_at | MedicationReminder: one row per real dose, created 7 days ahead (`medication_days_ahead`). Unique (schedule_id, due_at), so doses are never duplicated. `confirmed_at` only for `taken`/`missed`. Polled by worker (partial indexes on `scheduled` and `sent`). |
 | `refill_requests` | user_id, medication_id, status, external_ref | RefillRequest |
 | `message_threads` / `care_messages` | user_id, provider_id / thread_id, direction, body, status, sent_at, read_at | CareMessage |
 | `assistance_requests` | user_id, reason, summary, status, assigned_to | HumanAssistanceRequest |
@@ -648,7 +648,7 @@ All under `/api/v1`. All except auth and health require a valid access token. Ex
 | Actions (confirmation) | `GET /actions/pending` · `POST /actions/{id}/confirm` · `POST /actions/{id}/cancel` · `POST /actions/{id}/undo` |
 | Appointments | `GET /providers` · `GET /slots?provider_id&from&to` · `GET /appointments` · `GET /appointments/{id}` · *(create/cancel/reschedule via actions)* |
 | Appointment reminders | `GET /appointment-reminders` · `PATCH /appointment-reminders/settings` |
-| Medications | `GET /medications` · `GET /medication-reminders?date=` · `POST /medication-reminders/{id}/taken` |
+| Medications | `GET /older-adults/{id}/medications` (`medications:read`) · `POST /older-adults/{id}/medications` (`medications:manage`; creates doses right away) · `GET /older-adults/{id}/medication-reminders?date=` (`medications:read`; local date, default today) · `POST /medication-reminders/{id}/taken` · `POST /medication-reminders/{id}/missed` (taken/missed: only the older adult; 409 `too_early` more than 1 h before the dose). Paths include the older adult's id so caregivers use the same endpoints under the consent rules (§5.2). |
 | Refills | `GET /refills` · *(create via actions)* |
 | Messages | `GET /messages` · `GET /messages/{threadId}` · *(send via actions)* |
 | Assistance (handoff) | `POST /assistance` · `GET /assistance/queue` (agent) · `PATCH /assistance/{id}` (agent) |
