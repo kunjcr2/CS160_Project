@@ -29,5 +29,10 @@ class Settings(BaseSettings):
     # How long a pairing code works after it's created.
     pairing_code_minutes: int = 15
 
+    # Mock doctor's office. 0 = fast and never fails (good for tests).
+    # Turn on in .env to test slow or broken provider paths.
+    mock_provider_latency_ms: int = 0
+    mock_provider_failure_rate: float = 0.0  # 0.0 to 1.0 (0.2 = 20% of calls fail)
+
 
 settings = Settings()
