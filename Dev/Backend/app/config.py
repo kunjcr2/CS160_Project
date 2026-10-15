@@ -34,5 +34,8 @@ class Settings(BaseSettings):
     mock_provider_latency_ms: int = 0
     mock_provider_failure_rate: float = 0.0  # 0.0 to 1.0 (0.2 = 20% of calls fail)
 
+    # PB-03: how many days of medication doses to create ahead of time.
+    medication_days_ahead: int = 7
+
 
 settings = Settings()
