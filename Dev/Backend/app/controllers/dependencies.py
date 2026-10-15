@@ -4,10 +4,11 @@ import uuid
 from typing import Annotated
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session as DbSession
 
+from app.adapters.healthcare.interface import HealthcareProvider
 from app.db import get_session
 from app.model.entities import User
 from app.model.permissions import can_access
@@ -63,3 +64,13 @@ def require_access(scope: str):
         return older_adult_id
 
     return check
+
+
+def get_healthcare(request: Request) -> HealthcareProvider:
+    """The one shared doctor's office, built when the app starts (main.py)."""
+    return request.app.state.healthcare
+
+
+# Usage:  def my_endpoint(office: Healthcare)
+# Tests can swap it:  app.dependency_overrides[get_healthcare] = lambda: MockHealthcareProvider(...)
+Healthcare = Annotated[HealthcareProvider, Depends(get_healthcare)]
