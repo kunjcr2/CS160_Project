@@ -4,6 +4,8 @@ Controllers call these functions. No HTTP code here: the controller turns
 our errors into HTTP answers (401, 409, ...).
 """
 
+import secrets
+import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -14,7 +16,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
 
 from app.config import settings
-from app.model.entities import Session, User
+from app.model.entities import PairingCode, Session, User
+from app.model.permissions import can_access
 from app.model.security import (
     create_access_token,
     hash_password,
@@ -40,6 +43,14 @@ class InvalidCredentials(AuthError):
 
 class InvalidRefreshToken(AuthError):
     """Refresh token is unknown, expired, or revoked."""
+
+
+class NotAllowed(AuthError):
+    """Not allowed, or the person doesn't exist (we don't say which)."""
+
+
+class InvalidPairingCode(AuthError):
+    """Code is unknown, expired, or already used."""
 
 
 # ---------- Result ----------
@@ -125,6 +136,44 @@ def logout(db: DbSession, refresh_token: str) -> None:
     if current is not None and current.revoked_at is None:
         current.revoked_at = _now()
         db.commit()
+
+
+def create_pairing_code(
+    db: DbSession, *, actor: User, older_adult_id: uuid.UUID
+) -> tuple[str, datetime]:
+    """Make an 8-digit one-time code. Needs 'profile:manage' for this older adult."""
+    if not can_access(db, actor, older_adult_id, "profile:manage"):
+        raise NotAllowed()
+    # Digits only: easier for an older adult to type than letters.
+    code = "".join(secrets.choice("0123456789") for _ in range(8))
+    expires_at = _now() + timedelta(minutes=settings.pairing_code_minutes)
+    db.add(
+        PairingCode(
+            code_hash=hash_token(code),  # save the hash, never the code
+            older_adult_id=older_adult_id,
+            created_by=actor.id,
+            expires_at=expires_at,
+        )
+    )
+    db.commit()
+    return code, expires_at
+
+
+def redeem_pairing_code(
+    db: DbSession, *, code: str, device_label: str | None = None
+) -> LoginResult:
+    """Older adult's device types the code ONCE → signed in."""
+    digits = "".join(ch for ch in code if ch.isdigit())  # "1234 5678" → "12345678"
+    pairing = db.scalar(
+        select(PairingCode)
+        .where(PairingCode.code_hash == hash_token(digits))
+        .with_for_update()  # lock: two devices can't use the same code at once
+    )
+    if pairing is None or not pairing.is_usable(_now()):
+        raise InvalidPairingCode()
+    pairing.used_at = _now()  # now it can never be used again
+    user = db.get(User, pairing.older_adult_id)
+    return _start_session(db, user, device_label)  # saves used_at + session together
 
 
 # ---------- Private helpers (start with "_": only used in this file) ----------

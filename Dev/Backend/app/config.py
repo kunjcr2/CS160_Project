@@ -26,5 +26,8 @@ class Settings(BaseSettings):
     # Cookie "Secure" flag: cookie sent only over https. False for local http; True in production.
     cookie_secure: bool = False
 
+    # How long a pairing code works after it's created.
+    pairing_code_minutes: int = 15
+
 
 settings = Settings()

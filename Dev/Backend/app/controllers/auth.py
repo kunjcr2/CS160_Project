@@ -5,14 +5,18 @@ from typing import Annotated
 from fastapi import APIRouter, Cookie, HTTPException, Response, status
 
 from app.config import settings
-from app.controllers.dependencies import Db
+from app.controllers.dependencies import CurrentUser, Db
 from app.model.services import auth_service
 from app.model.services.auth_service import (
     EmailAlreadyRegistered,
     InvalidCredentials,
+    InvalidPairingCode,
     InvalidRefreshToken,
+    NotAllowed,
 )
+from app.views import messages
 from app.views.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserResponse
+from app.views.schemas.care import PairingCodeRequest, PairingCodeResponse, PairRequest
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -95,3 +99,30 @@ def logout(
     if refresh_token is not None:
         auth_service.logout(db, refresh_token)
     _clear_refresh_cookie(response)
+
+
+@router.post(
+    "/pairing-codes", status_code=status.HTTP_201_CREATED, response_model=PairingCodeResponse
+)
+def create_pairing_code(body: PairingCodeRequest, user: CurrentUser, db: Db) -> PairingCodeResponse:
+    """Caregiver makes a one-time code for an older adult's device."""
+    try:
+        code, expires_at = auth_service.create_pairing_code(
+            db, actor=user, older_adult_id=body.older_adult_id
+        )
+    except NotAllowed:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found.") from None
+    return PairingCodeResponse(code=code, expires_at=expires_at)
+
+
+@router.post("/pair", response_model=TokenResponse)
+def pair(body: PairRequest, response: Response, db: Db) -> TokenResponse:
+    """Older adult's device: code → access token + refresh cookie."""
+    try:
+        result = auth_service.redeem_pairing_code(
+            db, code=body.code, device_label=body.device_label
+        )
+    except InvalidPairingCode:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, messages.PAIRING_CODE_INVALID) from None
+    _set_refresh_cookie(response, result.refresh_token)
+    return TokenResponse(access_token=result.access_token)

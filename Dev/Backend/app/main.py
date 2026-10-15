@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.controllers import auth, health, users
+from app.controllers import auth, consents, health, older_adults, users
 
 
 def create_app() -> FastAPI:
@@ -26,6 +26,8 @@ def create_app() -> FastAPI:
     app.include_router(health.router, prefix="/api")
     app.include_router(auth.router, prefix="/api/v1")
     app.include_router(users.router, prefix="/api/v1")
+    app.include_router(older_adults.router, prefix="/api/v1")
+    app.include_router(consents.router, prefix="/api/v1")
 
     return app
 
