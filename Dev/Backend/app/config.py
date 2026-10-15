@@ -20,5 +20,11 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me-in-dotenv"
     access_token_minutes: int = 15
 
+    # How long a signed-in device stays signed in without logging in again.
+    refresh_token_days: int = 90
+
+    # Cookie "Secure" flag: cookie sent only over https. False for local http; True in production.
+    cookie_secure: bool = False
+
 
 settings = Settings()
