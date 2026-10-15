@@ -1,5 +1,6 @@
 # Python
 .venv/
+.pip-cache/
 __pycache__/
 *.py[cod]
 .pytest_cache/
