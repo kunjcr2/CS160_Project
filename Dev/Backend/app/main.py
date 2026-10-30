@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.controllers import actions, health
+from app.controllers import actions, appointments, health
 from app.controllers.conversation.endpoints import router as conversation_router
 from app.controllers.speech import router as speech_router
 
@@ -27,6 +27,7 @@ def create_app() -> FastAPI:
     # Feature routers go under /api/v1.
     app.include_router(health.router, prefix="/api")
     app.include_router(actions.router, prefix="/api/v1")
+    app.include_router(appointments.router, prefix="/api/v1")
     app.include_router(conversation_router, prefix="/api/v1")
     app.include_router(speech_router, prefix="/api/v1")
 
