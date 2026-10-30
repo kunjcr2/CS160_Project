@@ -10,6 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.controllers import actions, appointments, health, notifications
+from app.controllers.conversation.endpoints import router as conversation_router
+from app.controllers.speech import router as speech_router
 from app.workers import reminders
 
 
@@ -38,8 +40,13 @@ def create_app() -> FastAPI:
     app.include_router(actions.router, prefix="/api/v1")
     app.include_router(appointments.router, prefix="/api/v1")
     app.include_router(notifications.router, prefix="/api/v1")
+    app.include_router(conversation_router, prefix="/api/v1")
+    app.include_router(speech_router, prefix="/api/v1")
 
     return app
 
 
 app = create_app()
+
+# Public application entry point for other servers and imports.
+__all__ = ["app", "create_app"]
