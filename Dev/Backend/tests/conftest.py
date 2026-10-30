@@ -1,6 +1,8 @@
 """Shared test setup. Tests use the separate voice_assistant_test database (plan §12)."""
 
 import os
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from dotenv import dotenv_values  # installed with pydantic-settings
 
@@ -15,10 +17,24 @@ from fastapi import HTTPException  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
+from app.adapters.healthcare import (  # noqa: E402
+    MockHealthcareProvider,
+    get_healthcare_provider,
+    use_healthcare_provider,
+)
 from app.controllers.dependencies import SessionDep, get_current_user  # noqa: E402
 from app.db import SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
-from app.model.entities import Base, User  # noqa: E402
+from app.model.entities import Base, Provider, User  # noqa: E402
+
+LA = ZoneInfo("America/Los_Angeles")
+
+
+def next_tuesday() -> date:
+    """A Tuesday at least two days away (Los Angeles time), so every slot that day and
+    every reminder for it is in the future."""
+    day = datetime.now(LA).date() + timedelta(days=2)
+    return day + timedelta(days=(1 - day.weekday()) % 7)
 
 
 @pytest.fixture(scope="session")
@@ -68,3 +84,27 @@ def client(db):
     test_client.login_as = lambda user: state.update(user_id=user.id)
     yield test_client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def mock_provider():
+    """A fresh mock healthcare provider, so bookings don't leak between tests."""
+    original = get_healthcare_provider()
+    provider = MockHealthcareProvider()
+    use_healthcare_provider(provider)
+    yield provider
+    use_healthcare_provider(original)
+
+
+@pytest.fixture
+def chen(db) -> Provider:
+    provider = Provider(
+        name="Dr. Lisa Chen",
+        specialty="Cardiology",
+        location="Valley Medical, Building B",
+        phone="408-555-0142",
+        external_ref="prac-chen",
+    )
+    db.add(provider)
+    db.commit()
+    return provider
