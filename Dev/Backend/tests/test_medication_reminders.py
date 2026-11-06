@@ -7,6 +7,7 @@ import pytest
 
 from app.model.entities import Medication, MedicationReminder, MedicationSchedule, User
 from app.model.services.medication_reminders import (
+    BATCH_SIZE,
     MedicationReminderSource,
     ReminderNotChangeableError,
     ReminderNotFoundError,
@@ -110,6 +111,18 @@ def test_missed_after_60_minutes(db):
     dose = sent_dose(db, sent_minutes_ago=60, attempts=2)
     assert source.follow_up(db, NOW) == 1
     assert (dose.status, dose.confirmed_at) == ("missed", NOW)
+
+
+def test_already_reprompted_doses_do_not_block_newer_ones(db):
+    """A full batch of doses already shown twice must not delay a newer dose's 2nd reminder."""
+    # BATCH_SIZE older doses: shown twice, not yet 60 minutes old -> nothing to do now.
+    waiting = [sent_dose(db, sent_minutes_ago=45, attempts=2) for _ in range(BATCH_SIZE)]
+    # One newer dose that needs its 2nd reminder.
+    newer = sent_dose(db, sent_minutes_ago=35, attempts=1)
+
+    assert source.follow_up(db, NOW) == 1
+    assert (newer.status, newer.attempts) == ("sent", 2)
+    assert all((d.status, d.attempts) == ("sent", 2) for d in waiting)
 
 
 # ---------- mark_taken / mark_missed ----------
