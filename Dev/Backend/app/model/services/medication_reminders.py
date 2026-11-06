@@ -14,7 +14,7 @@ Nothing here commits; the caller does.
 import uuid
 from datetime import datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session as DbSession
 
 from app.config import settings
@@ -76,7 +76,14 @@ class MedicationReminderSource:
         waiting = db.scalars(
             select(MedicationReminder)
             .where(
-                MedicationReminder.status == "sent", MedicationReminder.sent_at <= reprompt_before
+                MedicationReminder.status == "sent",
+                MedicationReminder.sent_at <= reprompt_before,
+                # only doses that need a change now; doses already shown twice
+                # must not fill the batch before they are due to become missed
+                or_(
+                    MedicationReminder.attempts < 2,  # needs 2nd reminder
+                    MedicationReminder.sent_at <= missed_before,  # should become missed
+                ),
             )
             .order_by(MedicationReminder.sent_at)
             .limit(BATCH_SIZE)
