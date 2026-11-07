@@ -29,3 +29,9 @@ ACTION_EXPIRED = "That request timed out, so I didn't do anything. We can start 
 NOT_UNDERSTOOD = "Sorry, I didn't understand. Could you say that another way?"
 OFFER_HUMAN_HELP = "I'm having trouble with this. Would you like me to connect you with a person?"
 SERVICE_UNAVAILABLE = "Something went wrong on my end, and nothing was changed. Please try again."
+
+# Conversation (SR-08). These replies accompany proposals only; another controller
+# will persist and confirm any action before it can be carried out.
+APPOINTMENT_REQUEST_RECEIVED = "I can help you find an appointment. Which doctor should I look for?"
+MEDICATION_REQUEST_RECEIVED = "I can help set a medication reminder. What medicine and what time should I use?"
+AI_UNAVAILABLE = "I can't reach the assistant right now. Please try again."
