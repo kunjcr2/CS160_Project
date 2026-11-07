@@ -67,6 +67,7 @@ class Booking:
     starts_at: datetime  # UTC
     ends_at: datetime  # UTC
     location: str
+    patient_ref: str  # our user's id as text; lets book() recognize its own retry
 
 
 # ---------- Slot ids ----------
@@ -114,9 +115,18 @@ class HealthcareProvider(ABC):
         """Book the slot that starts at starts_at.
 
         patient_ref is our user's id as text. Raises SlotUnavailableError if the slot
-        is taken or does not exist.
+        is taken by someone else or does not exist. If this same patient already holds
+        this slot (e.g. a confirm retry after a lost response), returns that existing
+        booking instead of raising, so a retry can never "double-book" its own slot.
         """
 
     @abstractmethod
     def cancel(self, booking_ref: str) -> None:
-        """Cancel a booking. Raises BookingNotFoundError if it does not exist."""
+        """Cancel a booking.
+
+        An unknown or already-cancelled ref is a no-op, not an error: a cancel retry,
+        or a cancel for a booking the office system itself has forgotten (the mock
+        forgets everything on restart), must not fail just because the booking isn't
+        found. BookingNotFoundError is available for a real implementation that can
+        distinguish "never existed" from "already gone", but isn't required.
+        """

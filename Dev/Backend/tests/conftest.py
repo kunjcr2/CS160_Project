@@ -9,6 +9,8 @@ from dotenv import dotenv_values  # installed with pydantic-settings
 _test_url = os.environ.get("TEST_DATABASE_URL") or dotenv_values(".env").get("TEST_DATABASE_URL")
 os.environ["DATABASE_URL"] = _test_url or "postgresql+psycopg://localhost/voice_assistant_test"
 os.environ.setdefault("FAKE_AI", "true")
+# TestClient talks http, not https, so a Secure cookie would never come back.
+os.environ.setdefault("COOKIE_SECURE", "false")
 
 
 import pytest  # noqa: E402

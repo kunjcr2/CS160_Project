@@ -7,6 +7,7 @@
 
 # hashlib: makes SHA-256 hashes. secrets: makes safe random strings.
 import hashlib
+import hmac
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -84,3 +85,14 @@ def hash_token(token: str) -> str:
     SHA-256 (fast) is OK here because the token is long and random.
     Passwords need argon2 (slow) because people choose weak passwords."""
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+def hash_pairing_code(code: str) -> str:
+    """HMAC-SHA256 of a pairing code, keyed with JWT_SECRET.
+
+    An 8-digit code has only 10^8 possibilities, so a plain SHA-256 hash of
+    it could be reversed from a stolen database dump in seconds. Keying the
+    hash with a secret the attacker doesn't have makes "we only save a hash"
+    actually protect the code.
+    """
+    return hmac.new(settings.jwt_secret.encode(), code.encode(), hashlib.sha256).hexdigest()

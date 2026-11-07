@@ -10,6 +10,8 @@ from app.adapters.healthcare.interface import HealthcareProvider
 from app.adapters.healthcare.mock import MockHealthcareProvider
 from app.config import settings
 from app.controllers import auth, consents, health, medications, older_adults, users
+from app.controllers.conversation.endpoints import router as conversation_router
+from app.controllers.speech import router as speech_router
 
 
 def build_healthcare_provider() -> HealthcareProvider:
@@ -45,8 +47,13 @@ def create_app() -> FastAPI:
     app.include_router(older_adults.router, prefix="/api/v1")
     app.include_router(consents.router, prefix="/api/v1")
     app.include_router(medications.router, prefix="/api/v1")
+    app.include_router(conversation_router, prefix="/api/v1")
+    app.include_router(speech_router, prefix="/api/v1")
 
     return app
 
 
 app = create_app()
+
+# Public application entry point for other servers and imports.
+__all__ = ["app", "create_app"]

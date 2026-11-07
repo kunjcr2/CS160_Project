@@ -69,12 +69,17 @@ MARGARET_MEDICATIONS = [
 ]
 
 
-def seed_providers(db: DbSession) -> int:
-    """Copy the mock's doctors into the providers table. Returns how many were added."""
-    added = 0
+class SeedRoleMismatch(Exception):
+    """An email the seed script wants to use already belongs to a different role."""
+
+
+def seed_providers(db: DbSession) -> tuple[int, int]:
+    """Copy the mock's doctors into the providers table, updating any that changed.
+    Returns (added, updated)."""
+    added = updated = 0
     for doctor in PRACTITIONERS:
-        exists = db.scalar(select(Provider).where(Provider.external_ref == doctor.external_ref))
-        if exists is None:
+        existing = db.scalar(select(Provider).where(Provider.external_ref == doctor.external_ref))
+        if existing is None:
             db.add(
                 Provider(
                     external_ref=doctor.external_ref,
@@ -85,23 +90,47 @@ def seed_providers(db: DbSession) -> int:
                 )
             )
             added += 1
+            continue
+        if (existing.name, existing.specialty, existing.location, existing.phone) != (
+            doctor.name,
+            doctor.specialty,
+            doctor.location,
+            doctor.phone,
+        ):
+            existing.name = doctor.name
+            existing.specialty = doctor.specialty
+            existing.location = doctor.location
+            existing.phone = doctor.phone
+            updated += 1
     db.commit()
-    return added
+    return added, updated
 
 
-def get_or_create_login_user(db: DbSession, *, role: str, email: str, display_name: str) -> User:
-    """Find a user by email, or create one with the demo password."""
+def get_or_create_login_user(
+    db: DbSession, *, role: str, email: str, display_name: str
+) -> tuple[User, bool]:
+    """Find a user by email, or create one with the demo password.
+
+    Returns (user, created). Raises SeedRoleMismatch if the email already belongs
+    to a user with a different role: reusing it would sign that person in as the
+    wrong role, or silently fail to make the demo account this script promises.
+    """
     user = db.scalar(select(User).where(User.email == email))
-    if user is None:
-        user = User(
-            role=role,
-            email=email,
-            password_hash=hash_password(DEMO_PASSWORD),
-            display_name=display_name,
-        )
-        db.add(user)
-        db.commit()
-    return user
+    if user is not None:
+        if user.role != role:
+            raise SeedRoleMismatch(
+                f"{email} already exists with role {user.role!r}, expected {role!r}."
+            )
+        return user, False
+    user = User(
+        role=role,
+        email=email,
+        password_hash=hash_password(DEMO_PASSWORD),
+        display_name=display_name,
+    )
+    db.add(user)
+    db.commit()
+    return user, True
 
 
 def get_or_create_margaret(db: DbSession, caregiver: User) -> User:
@@ -163,21 +192,24 @@ def seed_all(db: DbSession, now: datetime | None = None) -> dict:
     now: the current time (tests pass a fixed one so the dose count is always the same).
     """
     now = now or datetime.now(UTC)
-    providers_added = seed_providers(db)
-    caregiver = get_or_create_login_user(
+    providers_added, providers_updated = seed_providers(db)
+    caregiver, caregiver_created = get_or_create_login_user(
         db, role="caregiver", email=CAREGIVER_EMAIL, display_name="Daniel Lee"
     )
-    agent = get_or_create_login_user(
+    agent, agent_created = get_or_create_login_user(
         db, role="support_agent", email=AGENT_EMAIL, display_name="Riley Chen"
     )
     margaret = get_or_create_margaret(db, caregiver)
     medications_added, doses_added = seed_medications(db, margaret, now)
     return {
         "providers_added": providers_added,
+        "providers_updated": providers_updated,
         "medications_added": medications_added,
         "doses_added": doses_added,
         "caregiver": caregiver,
+        "caregiver_created": caregiver_created,
         "agent": agent,
+        "agent_created": agent_created,
         "margaret": margaret,
     }
 
@@ -186,13 +218,21 @@ def main() -> None:
     print(f"Seeding database: {engine.url.database}")
     with SessionLocal() as db:
         result = seed_all(db)
-    print(f"  Providers added: {result['providers_added']} (0 = already there)")
+    print(
+        f"  Providers added: {result['providers_added']}, "
+        f"updated: {result['providers_updated']} (0/0 = already up to date)"
+    )
     print(f"  Margaret (older adult) id: {result['margaret'].id}")
     print(f"  Medications added: {result['medications_added']} (0 = already there)")
     print(f"  Doses added: {result['doses_added']} (next days, missing ones only)")
-    print(f"  Caregiver login: {CAREGIVER_EMAIL}")
-    print(f"  Support agent login: {AGENT_EMAIL}")
-    print("  Password for both: the DEMO_PASSWORD in scripts/seed.py")
+    for label, email, created in (
+        ("Caregiver", CAREGIVER_EMAIL, result["caregiver_created"]),
+        ("Support agent", AGENT_EMAIL, result["agent_created"]),
+    ):
+        if created:
+            print(f"  {label} login: {email}, password: {DEMO_PASSWORD!r} (just created)")
+        else:
+            print(f"  {label} login: {email}, already existed: password unchanged")
 
 
 if __name__ == "__main__":

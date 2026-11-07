@@ -3,6 +3,7 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+import pytest
 from sqlalchemy import func, select
 
 from app.model.entities import (
@@ -14,8 +15,15 @@ from app.model.entities import (
     User,
 )
 from app.model.entities.consent_grant import SCOPES
-from app.model.security import verify_password
-from scripts.seed import DEMO_PASSWORD, seed_all
+from app.model.security import hash_password, verify_password
+from scripts.seed import (
+    CAREGIVER_EMAIL,
+    DEMO_PASSWORD,
+    SeedRoleMismatch,
+    get_or_create_login_user,
+    seed_all,
+    seed_providers,
+)
 
 # Fixed "now": Sunday, Oct 18, 2026, 06:00 in California (before the first 08:00 dose).
 NOW = datetime(2026, 10, 18, 6, 0, tzinfo=ZoneInfo("America/Los_Angeles"))
@@ -73,3 +81,39 @@ def test_seed_twice_makes_no_duplicate_medications_or_doses(db):
     assert (second["medications_added"], second["doses_added"]) == (0, 0)
     assert count(db, Medication) == 4
     assert count(db, MedicationReminder) == 42
+
+
+def test_caregiver_email_with_a_different_role_is_rejected(db):
+    db.add(
+        User(
+            role="support_agent",
+            email=CAREGIVER_EMAIL,
+            password_hash=hash_password("some password"),
+            display_name="Someone Else",
+        )
+    )
+    db.commit()
+    with pytest.raises(SeedRoleMismatch):
+        get_or_create_login_user(
+            db, role="caregiver", email=CAREGIVER_EMAIL, display_name="Daniel Lee"
+        )
+
+
+def test_seed_providers_updates_changed_fields(db):
+    seed_providers(db)
+    doctor = db.scalar(select(Provider))
+    doctor.specialty = "Something Else"
+    db.commit()
+
+    added, updated = seed_providers(db)
+
+    assert added == 0
+    assert updated == 1
+    db.refresh(doctor)
+    assert doctor.specialty != "Something Else"
+
+
+def test_seed_providers_leaves_unchanged_rows_alone(db):
+    seed_providers(db)
+    added, updated = seed_providers(db)
+    assert (added, updated) == (0, 0)

@@ -8,6 +8,7 @@ from sqlalchemy import select
 
 from app.main import app
 from app.model.entities import PairingCode
+from app.model.services import auth_service
 
 PASSWORD = "correct horse battery"
 
@@ -154,3 +155,41 @@ def test_no_code_after_grant_is_revoked(client, carer, margaret_id):
     grant_id = client.get("/api/v1/consents", headers=carer).json()[0]["id"]
     assert client.delete(f"/api/v1/consents/{grant_id}", headers=carer).status_code == 204
     assert make_code(client, carer, margaret_id).status_code == 404
+
+
+def test_code_made_before_revoke_cannot_be_redeemed_after_revoke(client, carer, margaret_id):
+    code = make_code(client, carer, margaret_id).json()["code"]
+    grant_id = client.get("/api/v1/consents", headers=carer).json()[0]["id"]
+    assert client.delete(f"/api/v1/consents/{grant_id}", headers=carer).status_code == 204
+    assert pair(client, code).status_code == 401
+
+
+def test_older_adult_cannot_make_their_own_pairing_code(client, carer, margaret_id):
+    code = make_code(client, carer, margaret_id).json()["code"]
+    token = pair(client, code).json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    assert make_code(client, headers, margaret_id).status_code == 404
+
+
+def test_new_code_expires_the_caregivers_earlier_unused_code(client, carer, margaret_id):
+    old_code = make_code(client, carer, margaret_id).json()["code"]
+    make_code(client, carer, margaret_id)  # a second code supersedes the first
+    assert pair(client, old_code).status_code == 401
+
+
+def test_code_collision_retries_and_keeps_old_code_expired(client, carer, margaret_id, monkeypatch):
+    """If a new code collides with an existing one, the retry must not undo
+    the expiry of the caregiver's older code."""
+    old_code = make_code(client, carer, margaret_id).json()["code"]
+    fresh_code = f"{(int(old_code) + 1) % 10**8:08d}"
+    # First try reuses old_code (still in the unique index, so it collides),
+    # second try gets a different code.
+    codes = iter([old_code, fresh_code])
+    monkeypatch.setattr(auth_service, "_new_code", lambda: next(codes))
+
+    response = make_code(client, carer, margaret_id)
+
+    assert response.status_code == 201
+    assert response.json()["code"] == fresh_code
+    assert pair(client, old_code).status_code == 401  # still expired
+    assert pair(client, fresh_code).status_code == 200

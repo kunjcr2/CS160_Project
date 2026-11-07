@@ -91,6 +91,15 @@ def test_refresh_uses_the_cookie(client):
     assert response.json()["access_token"]
 
 
+def test_refresh_with_invalid_cookie_clears_it(client):
+    client.cookies.set("refresh_token", "not-a-real-token")
+    response = client.post("/api/v1/auth/refresh")
+    assert response.status_code == 401
+    cookie = response.headers["set-cookie"]
+    assert 'refresh_token=""' in cookie  # tells the browser to delete it
+    assert "max-age=0" in cookie.lower()
+
+
 def test_logout_revokes_session_and_clears_cookie(client, db):
     register(client)
     login(client)
