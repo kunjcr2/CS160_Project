@@ -117,17 +117,28 @@ def login(
 
 
 def refresh(db: DbSession, refresh_token: str) -> LoginResult:
-    """Swap a refresh token for a NEW access token and a NEW refresh token.
+    """Swap a refresh token for a NEW access token and a NEW refresh token,
+    on the SAME sessions row.
 
     "Rotation": the old refresh token stops working right away, so a stolen
-    copy is useful only until the real device refreshes once.
+    copy is useful only until the real device refreshes once. The row (and its
+    device identity) stays put instead of being replaced, so a caregiver's
+    revoke can't race a rotation and land on a row that's already gone. The
+    row's `expires_at` is NOT extended either: a session has one fixed
+    lifetime from login, however many times it rotates.
     """
-    old = _find_session(db, refresh_token)
-    if old is None or not old.is_active(_now()):
+    session = _find_session(db, refresh_token)
+    if session is None or not session.is_active(_now()):
         raise InvalidRefreshToken()
-    old.revoked_at = _now()
-    user = db.get(User, old.user_id)
-    return _start_session(db, user, old.device_label)  # saves both changes together
+    new_token = new_refresh_token()
+    session.refresh_token_hash = hash_token(new_token)
+    user = db.get(User, session.user_id)
+    db.commit()
+    return LoginResult(
+        user=user,
+        access_token=create_access_token(user.id, user.role),
+        refresh_token=new_token,
+    )
 
 
 def logout(db: DbSession, refresh_token: str) -> None:

@@ -8,6 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.controllers import auth, consents, health, older_adults, users
+from app.controllers.conversation.endpoints import router as conversation_router
+from app.controllers.speech import router as speech_router
 
 
 def create_app() -> FastAPI:
@@ -28,8 +30,13 @@ def create_app() -> FastAPI:
     app.include_router(users.router, prefix="/api/v1")
     app.include_router(older_adults.router, prefix="/api/v1")
     app.include_router(consents.router, prefix="/api/v1")
+    app.include_router(conversation_router, prefix="/api/v1")
+    app.include_router(speech_router, prefix="/api/v1")
 
     return app
 
 
 app = create_app()
+
+# Public application entry point for other servers and imports.
+__all__ = ["app", "create_app"]

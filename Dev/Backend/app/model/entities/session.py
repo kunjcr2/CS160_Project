@@ -1,7 +1,10 @@
-"""Signed-in devices. One row per login.
+"""Signed-in devices. One row per login, kept for the device's whole session.
 
 The device keeps a long random refresh token. We save only its SHA-256 hash,
-so a stolen database can't be used to sign in. Logout = set revoked_at.
+so a stolen database can't be used to sign in. Refreshing rotates the hash on
+THIS SAME row (expires_at stays fixed); it never inserts another row, so a
+caregiver revoking a lost device can't race a rotation onto a new row.
+Logout = set revoked_at.
 """
 
 import uuid

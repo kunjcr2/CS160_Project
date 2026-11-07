@@ -3,6 +3,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Cookie, HTTPException, Response, status
+from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.controllers.dependencies import CurrentUser, Db
@@ -84,7 +85,16 @@ def refresh(
     try:
         result = auth_service.refresh(db, refresh_token)
     except InvalidRefreshToken:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Please sign in again.") from None
+        # Build the error response ourselves and clear the cookie on IT: raising
+        # HTTPException here would build its own response and silently drop any
+        # cookie set on the injected `response`, leaving a dead cookie that gets
+        # resent on every /auth/* call for up to REFRESH_TOKEN_DAYS.
+        error_response = JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={"detail": "Please sign in again."},
+        )
+        _clear_refresh_cookie(error_response)
+        return error_response
     _set_refresh_cookie(response, result.refresh_token)
     return TokenResponse(access_token=result.access_token)
 
