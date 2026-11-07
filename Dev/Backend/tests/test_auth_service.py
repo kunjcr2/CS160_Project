@@ -79,6 +79,29 @@ def test_refresh_gives_new_tokens(db, caregiver):
     assert second.user.id == caregiver.id
 
 
+def test_refresh_rotates_the_same_session_row_instead_of_adding_one(db, caregiver):
+    first = auth_service.login(db, email="carer@example.com", password=PASSWORD)
+    before = db.scalar(select(Session))
+    before_id, before_hash = before.id, before.refresh_token_hash  # copy out, not a live ref
+
+    second = auth_service.refresh(db, first.refresh_token)
+
+    rows = db.scalars(select(Session)).all()
+    assert len(rows) == 1  # still one row for this device, not two
+    assert rows[0].id == before_id  # same row, not a new one
+    assert rows[0].refresh_token_hash == hash_token(second.refresh_token)
+    assert rows[0].refresh_token_hash != before_hash  # but the hash moved on
+
+
+def test_refresh_does_not_extend_the_expiry(db, caregiver):
+    first = auth_service.login(db, email="carer@example.com", password=PASSWORD)
+    original_expiry = db.scalar(select(Session)).expires_at
+
+    auth_service.refresh(db, first.refresh_token)
+
+    assert db.scalar(select(Session)).expires_at == original_expiry
+
+
 def test_old_refresh_token_stops_working_after_refresh(db, caregiver):
     first = auth_service.login(db, email="carer@example.com", password=PASSWORD)
     auth_service.refresh(db, first.refresh_token)
