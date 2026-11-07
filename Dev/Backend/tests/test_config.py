@@ -26,8 +26,11 @@ def test_long_random_jwt_secret_is_accepted():
 
 
 def test_cookie_secure_defaults_to_true(monkeypatch):
-    # conftest sets COOKIE_SECURE=false for the test suite (TestClient talks http,
-    # not https); unset it here to see what a deploy with no override gets.
+    # A real .env is free to set COOKIE_SECURE=false for local http dev, so this
+    # test can't just leave the env var alone and hope .env doesn't set it. Clear
+    # the env var AND stop THIS instance from reading the dotenv file at all, so
+    # the result reflects only the compiled-in default, never whatever's on disk.
     monkeypatch.delenv("COOKIE_SECURE", raising=False)
+    monkeypatch.setitem(Settings.model_config, "env_file", None)
     settings = Settings(database_url=_SOME_DATABASE_URL, jwt_secret="a" * 32)
     assert settings.cookie_secure is True
