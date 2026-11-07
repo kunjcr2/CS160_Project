@@ -337,6 +337,12 @@ Implementation:
 - **Every query that returns user data filters by owner.** Never fetch by id alone (`GET /appointments/42` must check that appointment 42 belongs to the caller). Missing this check is the most common real-world API vulnerability (IDOR).
 - Write tests that try to read another user's data and expect `404` (preferred over `403`, so we don't leak existence).
 
+Known gaps (from PR #18 review):
+- Revoking an older adult's last `profile:manage` grant leaves nobody able to mint a new pairing code for them, until `POST /consents` (granting a *new* caregiver) exists. A lost device would leave that older adult stuck in the meantime.
+- `profile:manage` lets a caregiver pair their own device as the older adult, which is effectively full impersonation of that older adult. This goes around the caregiver/older-adult scope split, but is intended for now.
+- `medications:manage` does not imply `medications:read`. This is fail-closed (a manage-only grant can write but not list), so keep it in mind once the medication routes land.
+- `POST /auth/pair` has no rate limiting yet. It's unauthenticated with a 10^8 code space, so brute-forcing active codes is a real risk; adding a per-IP and global cap is a follow-up (same limiter proposed for login).
+
 ### 5.3 Confirmation before action (the most important backend design)
 
 Every action that changes the outside world goes through a **pending action**:

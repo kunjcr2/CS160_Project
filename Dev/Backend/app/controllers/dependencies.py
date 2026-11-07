@@ -4,7 +4,7 @@ import uuid
 from typing import Annotated
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Path, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session as DbSession
 
@@ -57,7 +57,7 @@ def require_access(scope: str):
         owner_id: Annotated[uuid.UUID, Depends(require_access("appointments:read"))]
     """
 
-    def check(older_adult_id: uuid.UUID, user: CurrentUser, db: Db) -> uuid.UUID:
+    def check(older_adult_id: Annotated[uuid.UUID, Path()], user: CurrentUser, db: Db) -> uuid.UUID:
         if not can_access(db, user, older_adult_id, scope):
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found.")
         return older_adult_id

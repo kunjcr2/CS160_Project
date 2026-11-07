@@ -3,10 +3,10 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session as DbSession
 
-from app.model.entities import ConsentGrant, User
+from app.model.entities import ConsentGrant, PairingCode, User
 
 
 class GrantNotFound(Exception):
@@ -38,4 +38,24 @@ def revoke_grant(db: DbSession, user: User, grant_id: uuid.UUID) -> None:
     if grant is None:
         raise GrantNotFound()
     grant.revoked_at = datetime.now(UTC)
+    # A revoked grant must not leave this caregiver a still-usable pairing
+    # code: that code would otherwise hand them a fresh session anyway.
+    _expire_unused_codes(db, older_adult_id=grant.older_adult_id, created_by=grant.caregiver_id)
     db.commit()
+
+
+def _expire_unused_codes(
+    db: DbSession, *, older_adult_id: uuid.UUID, created_by: uuid.UUID
+) -> None:
+    """Make this caregiver's still-usable codes for this older adult stop working."""
+    now = datetime.now(UTC)
+    db.execute(
+        update(PairingCode)
+        .where(
+            PairingCode.older_adult_id == older_adult_id,
+            PairingCode.created_by == created_by,
+            PairingCode.used_at.is_(None),
+            PairingCode.expires_at > now,
+        )
+        .values(expires_at=now)
+    )
