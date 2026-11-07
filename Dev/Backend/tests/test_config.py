@@ -34,3 +34,15 @@ def test_cookie_secure_defaults_to_true(monkeypatch):
     monkeypatch.setitem(Settings.model_config, "env_file", None)
     settings = Settings(database_url=_SOME_DATABASE_URL, jwt_secret="a" * 32)
     assert settings.cookie_secure is True
+
+
+def test_negative_mock_provider_latency_is_rejected():
+    with pytest.raises(ValidationError):
+        Settings(database_url=_SOME_DATABASE_URL, jwt_secret="a" * 32, mock_provider_latency_ms=-1)
+
+
+def test_mock_provider_failure_rate_must_be_between_0_and_1():
+    with pytest.raises(ValidationError):
+        Settings(
+            database_url=_SOME_DATABASE_URL, jwt_secret="a" * 32, mock_provider_failure_rate=1.5
+        )

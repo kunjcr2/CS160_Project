@@ -5,7 +5,6 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from app.adapters.healthcare.interface import (
-    BookingNotFoundError,
     ProviderUnavailableError,
     SlotUnavailableError,
     parse_slot_id,
@@ -162,6 +161,14 @@ def test_same_time_with_another_doctor_is_fine(office):
     office.book("mock-prac-primary-care-1", local(10, 19, 9), "user-2")  # no error
 
 
+def test_same_patient_rebooking_the_same_slot_gets_the_same_booking(office):
+    # A confirm retry after a lost response must not look like a real conflict.
+    first = office.book(CARDIO, local(10, 19, 9), "user-1")
+    second = office.book(CARDIO, local(10, 19, 9), "user-1")
+    assert second.external_ref == first.external_ref
+    assert second.patient_ref == "user-1"
+
+
 @pytest.mark.parametrize(
     "starts_at",
     [
@@ -183,8 +190,11 @@ def test_cancel_frees_the_slot(office):
     office.cancel(booking.external_ref)
     assert len(office.find_slots(CARDIO, *MONDAY)) == 14
 
-    with pytest.raises(BookingNotFoundError):
-        office.cancel(booking.external_ref)  # already cancelled
+    office.cancel(booking.external_ref)  # already cancelled: a no-op, not an error
+
+
+def test_cancel_of_an_unknown_booking_is_a_no_op(office):
+    office.cancel("mock-appt-never-existed")  # no error, even though it was never booked
 
 
 # ---------- Safety and failures ----------
@@ -204,3 +214,19 @@ def test_failure_rate_1_always_fails():
 def test_failure_rate_must_be_between_0_and_1():
     with pytest.raises(ValueError):
         MockHealthcareProvider(failure_rate=1.5)
+
+
+def test_negative_latency_is_rejected():
+    with pytest.raises(ValueError):
+        MockHealthcareProvider(latency_ms=-1)
+
+
+def test_find_slots_range_over_60_days_is_rejected(office):
+    start = local(10, 19, 0)
+    with pytest.raises(ValueError):
+        office.find_slots(CARDIO, start, start + timedelta(days=61))
+
+
+def test_find_slots_range_of_60_days_is_allowed(office):
+    start = local(10, 19, 0)
+    office.find_slots(CARDIO, start, start + timedelta(days=60))  # no error

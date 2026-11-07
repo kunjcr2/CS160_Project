@@ -1,6 +1,6 @@
 """Settings loaded from .env. Never commit .env; commit .env.example."""
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # The placeholder shipped in .env.example. A real .env must replace it.
@@ -57,9 +57,11 @@ class Settings(BaseSettings):
     pairing_code_minutes: int = 15
 
     # Mock doctor's office. 0 = fast and never fails (good for tests).
-    # Turn on in .env to test slow or broken provider paths.
-    mock_provider_latency_ms: int = 0
-    mock_provider_failure_rate: float = 0.0  # 0.0 to 1.0 (0.2 = 20% of calls fail)
+    # Turn on in .env to test slow or broken provider paths. ge/le bounds make a
+    # bad .env value (e.g. a negative latency) fail at startup, naming the variable,
+    # instead of crashing the first provider call with a bare ValueError.
+    mock_provider_latency_ms: int = Field(default=0, ge=0)
+    mock_provider_failure_rate: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
 settings = Settings()

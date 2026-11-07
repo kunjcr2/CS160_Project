@@ -4,8 +4,11 @@
   the providers table, so the external_ref values match.
 - Free slots are generated, not stored: Monday to Friday, 9:00-17:00 office time,
   30 minutes each, no slots during lunch (12:00-13:00).
-- Bookings live in memory only and disappear when the server restarts. Our own
-  appointments table is the real record (its unique index still blocks double-booking).
+- Bookings live in memory only and disappear when the server restarts (and aren't
+  shared across `--workers`/processes): this mock is single-process only. Our own
+  appointments table is the source of truth; cancelling or rebooking a ref this mock
+  no longer knows about (because of a restart) is treated as a no-op/free slot
+  instead of an error, since a restart is expected to desync the two.
 - About 1 in 4 slots are "already taken" by other patients (more realistic demo). They
   are chosen by a stable hash, so the same slots are taken on every run. Tests can turn
   this off with pre_taken_slots=False.
@@ -27,7 +30,6 @@ from zoneinfo import ZoneInfo
 
 from .interface import (
     Booking,
-    BookingNotFoundError,
     HealthcareProvider,
     Practitioner,
     ProviderUnavailableError,
@@ -42,6 +44,11 @@ OPEN_AT = time(9, 0)
 CLOSE_AT = time(17, 0)
 LUNCH_HOUR = 12  # no slots from 12:00 to 13:00
 SLOT_LENGTH = timedelta(minutes=30)
+
+# find_slots range cap: without one, an end date far in the future (e.g. near
+# datetime.max, or just decades out) can build hundreds of thousands of Slot
+# objects or overflow doing date math.
+MAX_FIND_SLOTS_RANGE = timedelta(days=60)
 
 # ---------- Fake doctors ----------
 # 555-01xx phone numbers are reserved for fiction, so they never reach a real person.
@@ -132,6 +139,8 @@ class MockHealthcareProvider(HealthcareProvider):
         now: Callable[[], datetime] = _utc_now,
         pre_taken_slots: bool = True,
     ) -> None:
+        if latency_ms < 0:
+            raise ValueError("latency_ms must not be negative")
         if not 0.0 <= failure_rate <= 1.0:
             raise ValueError("failure_rate must be between 0.0 and 1.0")
         self._latency_seconds = latency_ms / 1000
@@ -153,6 +162,8 @@ class MockHealthcareProvider(HealthcareProvider):
 
     def find_slots(self, practitioner_ref: str, start: datetime, end: datetime) -> list[Slot]:
         _require_aware(start, end)
+        if end - start > MAX_FIND_SLOTS_RANGE:
+            raise ValueError(f"Range too large: max {MAX_FIND_SLOTS_RANGE.days} days.")
         self._simulate_network()
         if practitioner_ref not in self._practitioners:
             return []
@@ -177,7 +188,13 @@ class MockHealthcareProvider(HealthcareProvider):
         if self._is_taken_by_others(practitioner_ref, starts_at):
             raise SlotUnavailableError("Slot already booked by another patient.")
         with self._lock:
-            if starts_at in self._taken_starts(practitioner_ref):
+            existing = self._booking_at(practitioner_ref, starts_at)
+            if existing is not None:
+                # Same patient asking again (e.g. a confirm retry after a lost
+                # response) gets back their own booking instead of an error;
+                # anyone else gets the usual conflict.
+                if existing.patient_ref == patient_ref:
+                    return existing
                 raise SlotUnavailableError("Slot already booked.")
             booking = Booking(
                 external_ref=f"mock-appt-{uuid.uuid4().hex[:12]}",
@@ -185,6 +202,7 @@ class MockHealthcareProvider(HealthcareProvider):
                 starts_at=starts_at,
                 ends_at=starts_at + SLOT_LENGTH,
                 location=practitioner.location,
+                patient_ref=patient_ref,
             )
             self._bookings[booking.external_ref] = booking
         return booking
@@ -192,8 +210,7 @@ class MockHealthcareProvider(HealthcareProvider):
     def cancel(self, booking_ref: str) -> None:
         self._simulate_network()
         with self._lock:
-            if self._bookings.pop(booking_ref, None) is None:
-                raise BookingNotFoundError("No such booking.")
+            self._bookings.pop(booking_ref, None)
 
     # ---------- Helpers ----------
 
@@ -202,6 +219,13 @@ class MockHealthcareProvider(HealthcareProvider):
         return {
             b.starts_at for b in self._bookings.values() if b.practitioner_ref == practitioner_ref
         }
+
+    def _booking_at(self, practitioner_ref: str, starts_at: datetime) -> Booking | None:
+        """The booking (if any) for this doctor's slot. Call while holding the lock."""
+        for booking in self._bookings.values():
+            if booking.practitioner_ref == practitioner_ref and booking.starts_at == starts_at:
+                return booking
+        return None
 
     def _is_taken_by_others(self, practitioner_ref: str, starts_at: datetime) -> bool:
         return self._pre_taken_slots and _taken_by_other_patients(practitioner_ref, starts_at)
