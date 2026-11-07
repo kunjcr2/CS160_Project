@@ -32,3 +32,11 @@ SERVICE_UNAVAILABLE = "Something went wrong on my end, and nothing was changed. 
 
 # Sign-in
 PAIRING_CODE_INVALID = "That code didn't work. Please ask your helper for a new one."
+
+# Conversation (SR-08). These replies accompany proposals only; another controller
+# will persist and confirm any action before it can be carried out.
+APPOINTMENT_REQUEST_RECEIVED = "I can help you find an appointment. Which doctor should I look for?"
+MEDICATION_REQUEST_RECEIVED = (
+    "I can help set a medication reminder. What medicine and what time should I use?"
+)
+AI_UNAVAILABLE = "I can't reach the assistant right now. Please try again."

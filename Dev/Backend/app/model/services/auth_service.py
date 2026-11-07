@@ -9,7 +9,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 
 # Renamed to DbSession because our model is also called "Session".
@@ -20,11 +20,17 @@ from app.model.entities import PairingCode, Session, User
 from app.model.permissions import can_access
 from app.model.security import (
     create_access_token,
+    hash_pairing_code,
     hash_password,
     hash_token,
     new_refresh_token,
     verify_password,
 )
+
+# A random 8-digit code can, very rarely, collide with another caregiver's
+# still-active code (the unique index covers every unused code, not just
+# this older adult's). Retry a few times with a fresh code instead of 500ing.
+_MAX_CODE_ATTEMPTS = 5
 
 # ---------- Errors (the controller maps each one to an HTTP status) ----------
 
@@ -117,17 +123,28 @@ def login(
 
 
 def refresh(db: DbSession, refresh_token: str) -> LoginResult:
-    """Swap a refresh token for a NEW access token and a NEW refresh token.
+    """Swap a refresh token for a NEW access token and a NEW refresh token,
+    on the SAME sessions row.
 
     "Rotation": the old refresh token stops working right away, so a stolen
-    copy is useful only until the real device refreshes once.
+    copy is useful only until the real device refreshes once. The row (and its
+    device identity) stays put instead of being replaced, so a caregiver's
+    revoke can't race a rotation and land on a row that's already gone. The
+    row's `expires_at` is NOT extended either: a session has one fixed
+    lifetime from login, however many times it rotates.
     """
-    old = _find_session(db, refresh_token)
-    if old is None or not old.is_active(_now()):
+    session = _find_session(db, refresh_token)
+    if session is None or not session.is_active(_now()):
         raise InvalidRefreshToken()
-    old.revoked_at = _now()
-    user = db.get(User, old.user_id)
-    return _start_session(db, user, old.device_label)  # saves both changes together
+    new_token = new_refresh_token()
+    session.refresh_token_hash = hash_token(new_token)
+    user = db.get(User, session.user_id)
+    db.commit()
+    return LoginResult(
+        user=user,
+        access_token=create_access_token(user.id, user.role),
+        refresh_token=new_token,
+    )
 
 
 def logout(db: DbSession, refresh_token: str) -> None:
@@ -141,22 +158,38 @@ def logout(db: DbSession, refresh_token: str) -> None:
 def create_pairing_code(
     db: DbSession, *, actor: User, older_adult_id: uuid.UUID
 ) -> tuple[str, datetime]:
-    """Make an 8-digit one-time code. Needs 'profile:manage' for this older adult."""
-    if not can_access(db, actor, older_adult_id, "profile:manage"):
+    """Make an 8-digit one-time code. Caregiver-only, and needs 'profile:manage'
+    for this older adult."""
+    if actor.role != "caregiver" or not can_access(db, actor, older_adult_id, "profile:manage"):
         raise NotAllowed()
-    # Digits only: easier for an older adult to type than letters.
-    code = "".join(secrets.choice("0123456789") for _ in range(8))
+
+    # A fresh code supersedes any of this caregiver's codes still outstanding
+    # for this older adult, so a lost or forgotten one can't be redeemed later.
+    _expire_unused_codes(db, older_adult_id=older_adult_id, created_by=actor.id)
+
     expires_at = _now() + timedelta(minutes=settings.pairing_code_minutes)
-    db.add(
-        PairingCode(
-            code_hash=hash_token(code),  # save the hash, never the code
-            older_adult_id=older_adult_id,
-            created_by=actor.id,
-            expires_at=expires_at,
-        )
-    )
-    db.commit()
-    return code, expires_at
+    for attempt in range(_MAX_CODE_ATTEMPTS):
+        code = _new_code()
+        try:
+            # Savepoint: if this insert collides, undo ONLY this insert.
+            # A full db.rollback() would also undo _expire_unused_codes above,
+            # and the caregiver's older codes would work again.
+            with db.begin_nested():
+                db.add(
+                    PairingCode(
+                        code_hash=hash_pairing_code(code),  # save the hash, never the code
+                        older_adult_id=older_adult_id,
+                        created_by=actor.id,
+                        expires_at=expires_at,
+                    )
+                )
+        except IntegrityError:
+            if attempt == _MAX_CODE_ATTEMPTS - 1:
+                db.rollback()
+                raise
+            continue
+        db.commit()  # saves the expiry of old codes + the new code together
+        return code, expires_at
 
 
 def redeem_pairing_code(
@@ -166,10 +199,15 @@ def redeem_pairing_code(
     digits = "".join(ch for ch in code if ch.isdigit())  # "1234 5678" → "12345678"
     pairing = db.scalar(
         select(PairingCode)
-        .where(PairingCode.code_hash == hash_token(digits))
+        .where(PairingCode.code_hash == hash_pairing_code(digits))
         .with_for_update()  # lock: two devices can't use the same code at once
     )
     if pairing is None or not pairing.is_usable(_now()):
+        raise InvalidPairingCode()
+    creator = db.get(User, pairing.created_by)
+    # The creator's access may have been revoked after the code was minted;
+    # re-check it now so a code made before a revoke can't still sign in.
+    if creator is None or not can_access(db, creator, pairing.older_adult_id, "profile:manage"):
         raise InvalidPairingCode()
     pairing.used_at = _now()  # now it can never be used again
     user = db.get(User, pairing.older_adult_id)
@@ -177,6 +215,12 @@ def redeem_pairing_code(
 
 
 # ---------- Private helpers (start with "_": only used in this file) ----------
+
+
+def _new_code() -> str:
+    """A random 8-digit code. Digits only: easier for an older adult to type.
+    (A separate function so tests can force a collision.)"""
+    return "".join(secrets.choice("0123456789") for _ in range(8))
 
 
 def _start_session(db: DbSession, user: User, device_label: str | None) -> LoginResult:
@@ -195,6 +239,23 @@ def _start_session(db: DbSession, user: User, device_label: str | None) -> Login
         user=user,
         access_token=create_access_token(user.id, user.role),
         refresh_token=refresh_token,
+    )
+
+
+def _expire_unused_codes(
+    db: DbSession, *, older_adult_id: uuid.UUID, created_by: uuid.UUID
+) -> None:
+    """Make this caregiver's still-usable codes for this older adult stop working."""
+    now = _now()
+    db.execute(
+        update(PairingCode)
+        .where(
+            PairingCode.older_adult_id == older_adult_id,
+            PairingCode.created_by == created_by,
+            PairingCode.used_at.is_(None),
+            PairingCode.expires_at > now,
+        )
+        .values(expires_at=now)
     )
 
 
