@@ -1,5 +1,8 @@
 # Speech API
 
+For the combined transcription, intent, and spoken read-back endpoint, see
+[conversation-voice.md](conversation-voice.md).
+
 ## Setup
 
 - Add `OPENAI_API_KEY` to `.env`.

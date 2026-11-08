@@ -12,12 +12,12 @@ class Settings(BaseSettings):
     # Frontend origins allowed to call the API (Vite dev server).
     cors_origins: list[str] = ["http://127.0.0.1:5173", "http://localhost:5173"]
 
-    # Speech adapters can run locally in development; conversation intent extraction always uses OpenAI.
+    # FAKE_AI covers both conversation and speech for offline development and CI.
     fake_ai: bool = True
     openai_api_key: str | None = None
     openai_model: str = "gpt-6-luna"
     openai_reasoning_effort: str = "none"
-    openai_max_output_tokens: int = 120
+    openai_max_output_tokens: int = 300
     openai_stt_model: str = "gpt-4o-mini-transcribe"
     openai_tts_model: str = "gpt-4o-mini-tts"
     openai_tts_voice: str = "alloy"

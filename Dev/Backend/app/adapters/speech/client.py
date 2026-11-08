@@ -7,7 +7,13 @@ from openai import OpenAI
 
 
 class SpeechToText(Protocol):
-    def transcribe(self, audio: bytes, filename: str, content_type: str | None = None) -> str: ...
+    def transcribe(
+        self,
+        audio: bytes,
+        filename: str,
+        content_type: str | None = None,
+        language: str | None = None,
+    ) -> str: ...
 
 
 class TextToSpeech(Protocol):
@@ -15,7 +21,13 @@ class TextToSpeech(Protocol):
 
 
 class FakeSpeechToText:
-    def transcribe(self, audio: bytes, filename: str, content_type: str | None = None) -> str:
+    def transcribe(
+        self,
+        audio: bytes,
+        filename: str,
+        content_type: str | None = None,
+        language: str | None = None,
+    ) -> str:
         if not audio:
             raise ValueError("Audio file is empty")
         return "This is a fake transcription."
@@ -33,7 +45,13 @@ class OpenAISpeechToText:
         self._client = OpenAI(api_key=api_key)
         self._model = model
 
-    def transcribe(self, audio: bytes, filename: str) -> str:
+    def transcribe(
+        self,
+        audio: bytes,
+        filename: str,
+        content_type: str | None = None,
+        language: str | None = None,
+    ) -> str:
         if not audio:
             raise ValueError("Audio file is empty")
         file_object = BytesIO(audio)
@@ -42,8 +60,12 @@ class OpenAISpeechToText:
             file=file_object,
             model=self._model,
             response_format="json",
+            **({"language": language} if language in ("en", "es") else {}),
         )
-        return result.text
+        text = result.text.strip()
+        if not text:
+            raise ValueError("Transcription is empty")
+        return text
 
 
 class OpenAITextToSpeech:

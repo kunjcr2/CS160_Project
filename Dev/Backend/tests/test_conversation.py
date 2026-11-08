@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.adapters.llm.client import ModelResponse
+from app.controllers.conversation import tools
 from app.controllers.conversation.endpoints import get_language_model
 from app.main import app
 
@@ -64,10 +65,15 @@ def test_appointment_request_without_a_date_asks_for_a_date():
     )
 
     assert response.status_code == 200
-    assert response.json() == {
-        "reply": "What date would you prefer for your appointment with Dr. Chen?",
-        "proposal": {"kind": "appointment", "doctor": "Dr. Chen", "date_hint": None},
+    assert (
+        response.json()["reply"] == "What date would you prefer for your appointment with Dr. Chen?"
+    )
+    assert response.json()["proposal"] == {
+        "kind": "appointment",
+        "doctor": "Dr. Chen",
+        "date_hint": None,
     }
+    assert response.json()["readback"] is None
 
 
 def test_medication_request_returns_a_typed_proposal_without_creating_a_reminder():
@@ -91,8 +97,94 @@ def test_medication_request_returns_a_typed_proposal_without_creating_a_reminder
 def test_unknown_request_does_not_propose_an_action():
     response = post_with_model_response(
         {"text": "Tell me a joke."},
-        ModelResponse(reply="Sorry, I didn't understand. Could you say that another way?", proposal=None),
+        ModelResponse(
+            reply="Sorry, I didn't understand. Could you say that another way?", proposal=None
+        ),
     )
 
     assert response.status_code == 200
     assert response.json()["proposal"] is None
+
+
+def test_fake_ai_routes_all_four_intents_without_an_api_key():
+    client = TestClient(app)
+    cases = [
+        ("Book an appointment with Dr. Chen next Tuesday", "appointment"),
+        ("Remind me to take my aspirin at 8 pm", "medication_reminder"),
+        ("Refill my lisinopril", "refill"),
+        ("I want to speak to a person", "human_help"),
+    ]
+    for utterance, kind in cases:
+        response = client.post("/api/v1/ai/process", json={"text": utterance})
+        assert response.status_code == 200
+        assert response.json()["proposal"]["kind"] == kind
+        if kind in ("appointment", "medication_reminder", "refill"):
+            assert response.json()["readback"]
+    assert (
+        client.post("/api/v1/ai/process", json={"text": cases[0][0]}).json()["readback"]
+        == "I heard an appointment with Dr. Chen on next Tuesday. Is that right?"
+    )
+
+
+def test_spanish_and_unsupported_language_fallback():
+    client = TestClient(app)
+    spanish = client.post(
+        "/api/v1/ai/process",
+        json={"text": "Quiero una cita con Dra. Ruiz mañana", "language": "es"},
+    )
+    assert spanish.status_code == 200
+    assert spanish.json()["language"] == "es"
+    assert spanish.json()["proposal"]["kind"] == "appointment"
+    assert "¿Es correcto?" in spanish.json()["readback"]
+    unsupported = client.post(
+        "/api/v1/ai/process", json={"text": "Tell me a joke", "language": "fr"}
+    )
+    assert unsupported.json()["language"] == "en"
+
+
+def test_three_unclear_turns_offer_a_person_without_transferring_automatically():
+    response = TestClient(app).post("/api/v1/ai/process", json={"text": "hmm", "unclear_turns": 2})
+    assert response.status_code == 200
+    assert response.json()["offer_human_help"] is True
+    assert response.json()["unclear_turns"] == 3
+    assert response.json()["proposal"] is None
+
+    accepted = TestClient(app).post("/api/v1/ai/process", json={"text": "yes", "unclear_turns": 3})
+    assert accepted.json()["proposal"]["kind"] == "human_help"
+    assert "confirm" in accepted.json()["reply"].lower()
+
+
+def test_malformed_tool_arguments_are_rejected_before_proposal():
+    response = post_with_model_response(
+        {"text": "Book me"},
+        ModelResponse(
+            reply="",
+            proposal={
+                "kind": "appointment",
+                "doctor": "Dr. Chen",
+                "date_hint": "Tuesday",
+                "user_id": "other",
+            },
+        ),
+    )
+    assert response.status_code == 200
+    assert response.json()["proposal"] is None
+    assert response.json()["unclear_turns"] == 1
+
+
+def test_refill_tool_dispatch_calls_backend_proposal_function(monkeypatch):
+    called = []
+    original = tools.propose_refill
+
+    def record(medication):
+        called.append(medication)
+        return original(medication)
+
+    monkeypatch.setattr(tools, "propose_refill", record)
+    response = post_with_model_response(
+        {"text": "Refill my lisinopril"},
+        ModelResponse(reply="", proposal={"kind": "refill", "medication": "lisinopril"}),
+    )
+    assert response.status_code == 200
+    assert called == ["lisinopril"]
+    assert response.json()["proposal"]["kind"] == "refill"
