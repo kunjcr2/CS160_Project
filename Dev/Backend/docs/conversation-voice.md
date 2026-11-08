@@ -44,3 +44,6 @@ Set `FAKE_AI=true` for deterministic offline intent and speech tests. Set it to
 configurable with `OPENAI_STT_MODEL`; the default is `gpt-4o-mini-transcribe`.
 Measure real input latency and word accuracy against representative recordings
 before claiming the 1.5-second target; CI fakes cannot establish either metric.
+From `Dev/Backend`, run `python -m scripts.benchmark_stt --audio recording.webm
+--reference "the words spoken"`. With no `--audio`, the script generates a
+synthetic recording for a basic OpenAI integration check.
