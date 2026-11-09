@@ -1,35 +1,76 @@
-"""Shared FastAPI dependencies for controllers."""
+"""Shared FastAPI dependencies."""
 
 import uuid
 from typing import Annotated
 
-from fastapi import Depends, Header, HTTPException, status
-from sqlalchemy.orm import Session
+import jwt
+from fastapi import Depends, HTTPException, Path, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.orm import Session as DbSession
 
-from app.config import settings
+from app.adapters.healthcare.interface import HealthcareProvider
 from app.db import get_session
 from app.model.entities import User
+from app.model.permissions import can_access
+from app.model.security import decode_access_token
 
-SessionDep = Annotated[Session, Depends(get_session)]
+# Reads the "Authorization: Bearer <token>" header. auto_error=False: we send our own 401.
+_bearer = HTTPBearer(auto_error=False)
+
+# Short names to use in endpoints:  def my_endpoint(db: Db, user: CurrentUser)
+Db = Annotated[DbSession, Depends(get_session)]
+
+
+def _not_signed_in() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Not signed in.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
 
 def get_current_user(
-    session: SessionDep,
-    x_user_id: Annotated[uuid.UUID | None, Header()] = None,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+    db: Db,
 ) -> User:
-    """TEMPORARY stand-in until real auth lands (S2-03 / S2-04, Zohreh).
-
-    With DEV_USER_HEADER=true in .env, the caller is whoever the `X-User-Id` header names.
-    That trusts the client completely, so it is off by default and must never be enabled
-    outside local development. When auth is done, replace this function's body with the
-    real token check; every endpoint already depends on it, so nothing else changes.
-    """
-    if not settings.dev_user_header or x_user_id is None:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not authenticated")
-    user = session.get(User, x_user_id)
-    if user is None:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not authenticated")
+    """Return the signed-in user, or stop the request with 401."""
+    if credentials is None:  # no token sent
+        raise _not_signed_in()
+    try:
+        claims = decode_access_token(credentials.credentials)
+        user_id = uuid.UUID(claims["sub"])
+    except (jwt.InvalidTokenError, ValueError):  # fake, expired, or broken token
+        raise _not_signed_in() from None
+    user = db.get(User, user_id)
+    if user is None:  # token is fine but the user was deleted
+        raise _not_signed_in()
     return user
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+def require_access(scope: str):
+    """For routes with {older_adult_id} in the path. Not allowed → 404.
+
+    404, not 403: we don't even admit that the data exists (plan §5.2).
+    Usage:
+        owner_id: Annotated[uuid.UUID, Depends(require_access("appointments:read"))]
+    """
+
+    def check(older_adult_id: Annotated[uuid.UUID, Path()], user: CurrentUser, db: Db) -> uuid.UUID:
+        if not can_access(db, user, older_adult_id, scope):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found.")
+        return older_adult_id
+
+    return check
+
+
+def get_healthcare(request: Request) -> HealthcareProvider:
+    """The one shared doctor's office, built when the app starts (main.py)."""
+    return request.app.state.healthcare
+
+
+# Usage:  def my_endpoint(office: Healthcare)
+# Tests can swap it:  app.dependency_overrides[get_healthcare] = lambda: MockHealthcareProvider(...)
+Healthcare = Annotated[HealthcareProvider, Depends(get_healthcare)]

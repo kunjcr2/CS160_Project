@@ -5,7 +5,7 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, status
 
-from app.controllers.dependencies import CurrentUser, SessionDep
+from app.controllers.dependencies import CurrentUser, Db
 from app.model.services.appointment_reminders import ReminderAlreadyAnswered, ReminderNotFound
 from app.model.services.notifications import appointment_reminders, recent_notifications
 from app.views.schemas.notifications import NotificationOut
@@ -14,16 +14,14 @@ router = APIRouter(tags=["notifications"])
 
 
 @router.get("/notifications", response_model=list[NotificationOut])
-def list_notifications(user: CurrentUser, session: SessionDep):
+def list_notifications(user: CurrentUser, session: Db):
     """Every reminder (appointment and medication) that came due in the last 12 hours,
     with its current status, oldest first. Not-yet-due reminders are not included."""
     return [NotificationOut.from_notification(n) for n in recent_notifications(session, user)]
 
 
 @router.post("/appointment-reminders/{reminder_id}/acknowledge", response_model=NotificationOut)
-def acknowledge_appointment_reminder(
-    reminder_id: uuid.UUID, user: CurrentUser, session: SessionDep
-):
+def acknowledge_appointment_reminder(reminder_id: uuid.UUID, user: CurrentUser, session: Db):
     """The OK button. 404 not found or not yours · 409 not waiting for an answer."""
     try:
         item = appointment_reminders.acknowledge(session, user, reminder_id)
