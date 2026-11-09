@@ -73,7 +73,33 @@ uvicorn app.main:app --reload --port 5000
 - Health check: <http://127.0.0.1:5000/api/health>
 - Interactive API docs (the API contract): <http://127.0.0.1:5000/docs>
 
+### Reminder worker
+
+Reminders are sent by a background worker (plan §6.3). Either run it in a second terminal:
+
+```bash
+python -m app.workers.reminders
+```
+
+or set `RUN_REMINDER_WORKER=true` in `.env` to run it inside the server process. Running both is
+safe: each reminder is still sent only once.
+
+### Trying the API
+
+Sign in with `POST /api/v1/auth/login` (e.g. as the seeded caregiver) or redeem a pairing code
+with `POST /api/v1/auth/pair` (an older adult's device), then send
+`Authorization: Bearer <access_token>` with every request.
+
+Booking flow: `GET /api/v1/providers?name=Dr. Ruiz` → `GET /api/v1/slots?provider_id=...` →
+`POST /api/v1/actions` with `{"action_type": "book_appointment", "payload": {"slot_id": "..."}}` →
+read `summary_text` back → `POST /api/v1/actions/{id}/confirm`. The frontend polls
+`GET /api/v1/notifications` for reminders.
+
 ## 5. Test and lint
+
+Tests run against the `voice_assistant_test` database (`TEST_DATABASE_URL` in `.env`), so
+PostgreSQL must be running. The tests run the migrations themselves and empty the tables after
+each test; your development database is never touched.
 
 ```bash
 pytest
