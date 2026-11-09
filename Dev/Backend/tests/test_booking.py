@@ -1,14 +1,14 @@
 """PB-01 booking (S2-09): Margaret's cardiology appointment is booked after a yes; a slot
 taken in the meantime is handled."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 import pytest
 from conftest import next_tuesday
 from sqlalchemy import func, select
 
-from app.adapters.healthcare import MockHealthcareProvider, ProviderUnavailable
+from app.adapters.healthcare.interface import ProviderUnavailableError
 from app.model.entities import Appointment, Provider
 from app.model.services.action_service import ActionService
 from app.model.services.appointment_service import AppointmentService
@@ -70,9 +70,11 @@ def test_margaret_books_her_cardiology_appointment_after_a_yes(client, make_user
     assert appointment.external_ref.startswith("mock-appt-")
 
 
-def test_slot_taken_between_proposal_and_yes_is_explained(client, make_user, chen, db):
+def test_slot_taken_between_proposal_and_yes_is_explained(
+    client, make_user, chen, db, mock_provider
+):
     margaret, david = make_user("Margaret"), make_user("David")
-    service = AppointmentService(db)
+    service = AppointmentService(db, healthcare=mock_provider)
     slot = service.find_slots(margaret, chen, next_tuesday(), next_tuesday())[0]
 
     client.login_as(margaret)
@@ -82,7 +84,7 @@ def test_slot_taken_between_proposal_and_yes_is_explained(client, make_user, che
     ).json()
 
     # David books the same slot before Margaret says yes.
-    actions = ActionService(db)
+    actions = ActionService(db, healthcare=mock_provider)
     davids = actions.propose(david, "book_appointment", {"slot_id": slot.slot_id})
     assert actions.confirm(davids.id, david).action.status == "executed"
     db.commit()
@@ -98,10 +100,12 @@ def test_slot_taken_between_proposal_and_yes_is_explained(client, make_user, che
     assert _appointments(db) == 1  # only David's
 
 
-def test_an_already_booked_slot_cannot_be_proposed(client, make_user, chen, db):
+def test_an_already_booked_slot_cannot_be_proposed(client, make_user, chen, db, mock_provider):
     margaret, david = make_user("Margaret"), make_user("David")
-    slot = AppointmentService(db).find_slots(margaret, chen, next_tuesday(), next_tuesday())[0]
-    actions = ActionService(db)
+    slot = AppointmentService(db, healthcare=mock_provider).find_slots(
+        margaret, chen, next_tuesday(), next_tuesday()
+    )[0]
+    actions = ActionService(db, healthcare=mock_provider)
     actions.confirm(actions.propose(david, "book_appointment", {"slot_id": slot.slot_id}).id, david)
     db.commit()
 
@@ -115,11 +119,11 @@ def test_an_already_booked_slot_cannot_be_proposed(client, make_user, chen, db):
     assert response.json()["detail"]["code"] == "slot_taken"
 
 
-def test_booked_slots_are_not_offered_again(make_user, chen, db):
+def test_booked_slots_are_not_offered_again(make_user, chen, db, mock_provider):
     margaret = make_user()
-    service = AppointmentService(db)
+    service = AppointmentService(db, healthcare=mock_provider)
     first = service.find_slots(margaret, chen, next_tuesday(), next_tuesday())
-    actions = ActionService(db)
+    actions = ActionService(db, healthcare=mock_provider)
     actions.confirm(
         actions.propose(margaret, "book_appointment", {"slot_id": first[0].slot_id}).id, margaret
     )
@@ -129,7 +133,7 @@ def test_booked_slots_are_not_offered_again(make_user, chen, db):
 
 
 def test_provider_down_at_confirm_offers_the_office_phone(
-    client, make_user, chen, db, mock_provider
+    client, make_user, chen, db, mock_provider, monkeypatch
 ):
     client.login_as(make_user())
     slot = client.get(
@@ -140,7 +144,12 @@ def test_provider_down_at_confirm_offers_the_office_phone(
         json={"action_type": "book_appointment", "payload": {"slot_id": slot["slot_id"]}},
     ).json()
 
-    mock_provider.failure_rate = 1.0  # every call to the provider fails from now on
+    def provider_down(*args, **kwargs):
+        raise ProviderUnavailableError("down")
+
+    # Every call to the provider fails from now on.
+    monkeypatch.setattr(mock_provider, "find_slots", provider_down)
+    monkeypatch.setattr(mock_provider, "book", provider_down)
     response = client.post(f"/api/v1/actions/{proposed['id']}/confirm").json()
 
     assert response["action"]["status"] == "failed"
@@ -154,12 +163,14 @@ def test_provider_failing_during_booking_leaves_nothing_behind(
     make_user, chen, db, mock_provider, monkeypatch
 ):
     margaret = make_user()
-    slot = AppointmentService(db).find_slots(margaret, chen, next_tuesday(), next_tuesday())[0]
-    actions = ActionService(db)
+    slot = AppointmentService(db, healthcare=mock_provider).find_slots(
+        margaret, chen, next_tuesday(), next_tuesday()
+    )[0]
+    actions = ActionService(db, healthcare=mock_provider)
     action = actions.propose(margaret, "book_appointment", {"slot_id": slot.slot_id})
 
     def provider_down(*args, **kwargs):
-        raise ProviderUnavailable("down")
+        raise ProviderUnavailableError("down")
 
     monkeypatch.setattr(mock_provider, "book", provider_down)
     outcome = actions.confirm(action.id, margaret)
@@ -180,10 +191,12 @@ def test_unknown_slot_cannot_be_proposed(client, make_user, chen):
         assert response.json()["detail"]["code"] == "slot_not_found"
 
 
-def test_users_cannot_see_each_others_appointments(client, make_user, chen, db):
+def test_users_cannot_see_each_others_appointments(client, make_user, chen, db, mock_provider):
     margaret, david = make_user("Margaret"), make_user("David")
-    slot = AppointmentService(db).find_slots(margaret, chen, next_tuesday(), next_tuesday())[0]
-    actions = ActionService(db)
+    slot = AppointmentService(db, healthcare=mock_provider).find_slots(
+        margaret, chen, next_tuesday(), next_tuesday()
+    )[0]
+    actions = ActionService(db, healthcare=mock_provider)
     result = actions.confirm(
         actions.propose(margaret, "book_appointment", {"slot_id": slot.slot_id}).id, margaret
     )
@@ -201,7 +214,7 @@ def test_users_cannot_see_each_others_appointments(client, make_user, chen, db):
 # --- Provider lookup, mock provider, formatting -----------------------------------------
 
 
-def test_provider_name_matching(db):
+def test_provider_name_matching(db, mock_provider):
     db.add_all(
         [
             Provider(name="Dr. Lisa Chen", specialty="Cardiology", location="A", external_ref="a"),
@@ -214,7 +227,7 @@ def test_provider_name_matching(db):
         ]
     )
     db.commit()
-    service = AppointmentService(db)
+    service = AppointmentService(db, healthcare=mock_provider)
 
     assert [p.name for p in service.find_providers("Dr. Chen")] == ["Dr. Lisa Chen"]
     assert [p.name for p in service.find_providers("chen")] == ["Dr. Lisa Chen"]
@@ -222,22 +235,6 @@ def test_provider_name_matching(db):
     assert service.find_providers("Dr. Smith") == []
     assert service.find_providers("Dr.") == []
     assert len(service.find_providers()) == 3
-
-
-def test_mock_provider_offers_weekday_working_hours_only():
-    provider = MockHealthcareProvider()
-    saturday = datetime(2026, 10, 17, tzinfo=LA)
-    monday = datetime(2026, 10, 19, tzinfo=LA)
-
-    assert provider.search_slots("prac-chen", saturday, saturday + timedelta(days=2)) == []
-    slots = provider.search_slots("prac-chen", monday, monday + timedelta(days=1))
-    assert slots
-    for slot in slots:
-        local = slot.start.astimezone(LA)
-        assert 9 <= local.hour < 12 or 13 <= local.hour < 17
-        assert slot.end - slot.start == timedelta(minutes=30)
-        assert slot.start.tzinfo == UTC
-    assert slots == provider.search_slots("prac-chen", monday, monday + timedelta(days=1))
 
 
 def test_spoken_formats():

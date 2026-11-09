@@ -61,9 +61,10 @@ def slow_revalidate(monkeypatch):
     return enable
 
 
-def confirm_in_new_session(action_id, user_id):
+def confirm_in_new_session(action_id, user_id, office):
     with SessionLocal() as session:
-        outcome = ActionService(session).confirm(action_id, session.get(User, user_id))
+        actions = ActionService(session, healthcare=office)
+        outcome = actions.confirm(action_id, session.get(User, user_id))
         session.commit()
         return outcome.action.status, outcome.message
 
@@ -72,16 +73,20 @@ def _count(db, model, *where) -> int:
     return db.scalar(select(func.count()).select_from(model).where(*where))
 
 
-def test_two_simultaneous_confirms_book_once(db, make_user, chen, slow_revalidate):
+def test_two_simultaneous_confirms_book_once(db, make_user, chen, slow_revalidate, mock_provider):
     margaret = make_user()
-    slot = AppointmentService(db).find_slots(margaret, chen, next_tuesday(), next_tuesday())[0]
-    action = ActionService(db).propose(margaret, "book_appointment", {"slot_id": slot.slot_id})
+    slot = AppointmentService(db, healthcare=mock_provider).find_slots(
+        margaret, chen, next_tuesday(), next_tuesday()
+    )[0]
+    action = ActionService(db, healthcare=mock_provider).propose(
+        margaret, "book_appointment", {"slot_id": slot.slot_id}
+    )
     db.commit()
     slow_revalidate()
 
     first, second = in_parallel(
-        lambda: confirm_in_new_session(action.id, margaret.id),
-        lambda: confirm_in_new_session(action.id, margaret.id),
+        lambda: confirm_in_new_session(action.id, margaret.id, mock_provider),
+        lambda: confirm_in_new_session(action.id, margaret.id, mock_provider),
     )
 
     assert first == second  # the second request gets the first one's answer
@@ -89,18 +94,22 @@ def test_two_simultaneous_confirms_book_once(db, make_user, chen, slow_revalidat
     assert _count(db, Appointment) == 1
 
 
-def test_two_people_confirming_the_same_slot_get_one_booking(db, make_user, chen, slow_revalidate):
+def test_two_people_confirming_the_same_slot_get_one_booking(
+    db, make_user, chen, slow_revalidate, mock_provider
+):
     margaret, david = make_user("Margaret"), make_user("David")
-    slot = AppointmentService(db).find_slots(margaret, chen, next_tuesday(), next_tuesday())[0]
-    actions = ActionService(db)
+    slot = AppointmentService(db, healthcare=mock_provider).find_slots(
+        margaret, chen, next_tuesday(), next_tuesday()
+    )[0]
+    actions = ActionService(db, healthcare=mock_provider)
     hers = actions.propose(margaret, "book_appointment", {"slot_id": slot.slot_id})
     his = actions.propose(david, "book_appointment", {"slot_id": slot.slot_id})
     db.commit()
     slow_revalidate()  # both pass the "is the slot free?" check before either books
 
     results = in_parallel(
-        lambda: confirm_in_new_session(hers.id, margaret.id),
-        lambda: confirm_in_new_session(his.id, david.id),
+        lambda: confirm_in_new_session(hers.id, margaret.id, mock_provider),
+        lambda: confirm_in_new_session(his.id, david.id, mock_provider),
     )
 
     assert sorted(status for status, _ in results) == ["executed", "failed"]

@@ -1,101 +1,238 @@
-"""In-memory mock provider (plan §6.2). Mock data only, never real patients.
+"""MockHealthcareProvider: a fake doctor's office for development, tests, and the demo.
 
-Every practitioner works weekdays 9:00-12:00 and 13:00-16:30 clinic time in 30-minute
-slots. About a quarter of the slots are "already taken" by other patients, chosen by a
-hash so results are the same on every run. Latency and random failures are configurable
-so the error paths can be exercised.
+- The doctors are fixed (Margaret's story). The seed script copies them into
+  the providers table, so the external_ref values match.
+- Free slots are generated, not stored: Monday to Friday, 9:00-17:00 office time,
+  30 minutes each, no slots during lunch (12:00-13:00).
+- Bookings live in memory only and disappear when the server restarts (and aren't
+  shared across `--workers`/processes): this mock is single-process only. Our own
+  appointments table is the source of truth; cancelling or rebooking a ref this mock
+  no longer knows about (because of a restart) is treated as a no-op/free slot
+  instead of an error, since a restart is expected to desync the two.
+- About 1 in 4 slots are "already taken" by other patients (more realistic demo). They
+  are chosen by a stable hash, so the same slots are taken on every run. Tests can turn
+  this off with pre_taken_slots=False.
+- Every slot has an id (see make_slot_id), so the AI or the screen can pass it back.
+- Slow calls and random failures can be turned on to test error paths.
+
+Mock/demo data only. No real people, no real patients.
+Error texts here are for developers; user-facing sentences live in views/messages.py.
 """
 
 import random
-import time
+import threading
 import uuid
 import zlib
-from datetime import UTC, date, datetime, timedelta
-from datetime import time as clock_time
+from collections.abc import Callable, Iterator
+from datetime import UTC, datetime, time, timedelta
+from time import sleep
 from zoneinfo import ZoneInfo
 
-from .base import ProviderUnavailable, Slot, SlotUnavailable, make_slot_id, parse_slot_id
+from .interface import (
+    Booking,
+    HealthcareProvider,
+    Practitioner,
+    ProviderUnavailableError,
+    Slot,
+    SlotUnavailableError,
+    make_slot_id,
+)
 
-WORKING_HOURS = ((clock_time(9, 0), clock_time(12, 0)), (clock_time(13, 0), clock_time(16, 30)))
+# ---------- Office hours ----------
+OFFICE_TZ = ZoneInfo("America/Los_Angeles")  # zoneinfo handles daylight saving for us
+OPEN_AT = time(9, 0)
+CLOSE_AT = time(17, 0)
+LUNCH_HOUR = 12  # no slots from 12:00 to 13:00
+SLOT_LENGTH = timedelta(minutes=30)
+
+# find_slots range cap: without one, an end date far in the future (e.g. near
+# datetime.max, or just decades out) can build hundreds of thousands of Slot
+# objects or overflow doing date math.
+MAX_FIND_SLOTS_RANGE = timedelta(days=60)
+
+# ---------- Fake doctors ----------
+# 555-01xx phone numbers are reserved for fiction, so they never reach a real person.
+PRACTITIONERS: tuple[Practitioner, ...] = (
+    Practitioner(
+        external_ref="mock-prac-cardiology-1",
+        name="Dr. Elena Ruiz",
+        specialty="Cardiology",
+        location="Valley Heart Clinic, 100 Example Ave, San Jose, CA",
+        phone="408-555-0101",
+    ),
+    Practitioner(
+        external_ref="mock-prac-physical-therapy-1",
+        name="Sam Patel, PT",
+        specialty="Physical Therapy",
+        location="MoveWell Physical Therapy, 200 Example Ave, San Jose, CA",
+        phone="408-555-0102",
+    ),
+    Practitioner(
+        external_ref="mock-prac-primary-care-1",
+        name="Dr. Grace Kim",
+        specialty="Primary Care",
+        location="Downtown Family Medicine, 300 Example Ave, San Jose, CA",
+        phone="408-555-0103",
+    ),
+)
 
 
-class MockHealthcareProvider:
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
+
+
+def _require_aware(*values: datetime) -> None:
+    """Refuse datetimes without a time zone; they cause silent time bugs."""
+    for value in values:
+        if value.tzinfo is None:
+            raise ValueError("Use timezone-aware datetimes (UTC).")
+
+
+def _is_office_slot(starts_at: datetime) -> bool:
+    """True if a slot can start at this moment (weekday, office hours, not lunch)."""
+    local = starts_at.astimezone(OFFICE_TZ)
+    return (
+        local.weekday() < 5  # 0 = Monday ... 4 = Friday
+        and local.minute in (0, 30)
+        and local.second == 0
+        and local.microsecond == 0
+        and OPEN_AT <= local.time() < CLOSE_AT
+        and local.hour != LUNCH_HOUR
+    )
+
+
+def _office_slots(practitioner_ref: str, start: datetime, end: datetime) -> Iterator[Slot]:
+    """Every slot (free or not) between start and end, in time order."""
+    day = start.astimezone(OFFICE_TZ).date()
+    last_day = end.astimezone(OFFICE_TZ).date()
+    while day <= last_day:
+        local = datetime.combine(day, OPEN_AT, tzinfo=OFFICE_TZ)
+        while local.time() < CLOSE_AT:
+            starts_at = local.astimezone(UTC)
+            ends_at = starts_at + SLOT_LENGTH
+            if _is_office_slot(starts_at) and start <= starts_at and ends_at <= end:
+                yield Slot(
+                    id=make_slot_id(practitioner_ref, starts_at),
+                    practitioner_ref=practitioner_ref,
+                    starts_at=starts_at,
+                    ends_at=ends_at,
+                )
+            local += SLOT_LENGTH
+        day += timedelta(days=1)
+
+
+def _taken_by_other_patients(practitioner_ref: str, starts_at: datetime) -> bool:
+    """True for about 1 in 4 slots. A stable hash (crc32), so the same slots are taken
+    on every run and every computer. Same rule as Amar's first mock."""
+    key = f"{practitioner_ref}{starts_at.astimezone(UTC):%Y%m%dT%H%M}"
+    return zlib.crc32(key.encode()) % 4 == 0
+
+
+class MockHealthcareProvider(HealthcareProvider):
+    """In-memory fake office. Create ONE per app, so all requests share the bookings."""
+
     def __init__(
         self,
-        *,
-        clinic_timezone: str = "America/Los_Angeles",
-        slot_minutes: int = 30,
-        latency_seconds: float = 0.0,
+        latency_ms: int = 0,
         failure_rate: float = 0.0,
-        rng: random.Random | None = None,
+        seed: int | None = None,
+        now: Callable[[], datetime] = _utc_now,
+        pre_taken_slots: bool = True,
     ) -> None:
-        self.clinic_tz = ZoneInfo(clinic_timezone)
-        self.slot_length = timedelta(minutes=slot_minutes)
-        self.latency_seconds = latency_seconds
-        self.failure_rate = failure_rate
-        self._rng = rng or random.Random()
-        self._bookings: dict[str, str] = {}  # booking ref -> slot id
+        if latency_ms < 0:
+            raise ValueError("latency_ms must not be negative")
+        if not 0.0 <= failure_rate <= 1.0:
+            raise ValueError("failure_rate must be between 0.0 and 1.0")
+        self._latency_seconds = latency_ms / 1000
+        self._failure_rate = failure_rate
+        self._random = random.Random(seed)  # a seed makes failures repeatable in tests
+        self._now = now  # tests can pass a fixed "now"
+        self._pre_taken_slots = pre_taken_slots  # False = every slot starts free (tests)
+        self._practitioners = {p.external_ref: p for p in PRACTITIONERS}
+        self._bookings: dict[str, Booking] = {}
+        # FastAPI runs normal endpoints in several threads; the lock stops two
+        # requests from booking the same slot at the same moment.
+        self._lock = threading.Lock()
 
-    def search_slots(self, practitioner_ref: str, start: datetime, end: datetime) -> list[Slot]:
-        self._simulate_network()
-        booked = set(self._bookings.values())
-        day = start.astimezone(self.clinic_tz).date()
-        last_day = end.astimezone(self.clinic_tz).date()
-        slots = []
-        while day <= last_day:
-            for slot in self._slots_on(practitioner_ref, day):
-                if start <= slot.start < end and slot.id not in booked:
-                    slots.append(slot)
-            day += timedelta(days=1)
-        return slots
+    # ---------- HealthcareProvider methods ----------
 
-    def book(self, slot_id: str, patient_ref: str) -> str:
+    def list_practitioners(self) -> list[Practitioner]:
         self._simulate_network()
-        try:
-            practitioner_ref, start = parse_slot_id(slot_id)
-        except ValueError:
-            raise SlotUnavailable(slot_id) from None
-        if slot_id in self._bookings.values() or not self._is_open(practitioner_ref, start):
-            raise SlotUnavailable(slot_id)
-        booking_ref = f"mock-appt-{uuid.uuid4().hex[:12]}"
-        self._bookings[booking_ref] = slot_id
-        return booking_ref
+        return list(self._practitioners.values())
+
+    def find_slots(self, practitioner_ref: str, start: datetime, end: datetime) -> list[Slot]:
+        _require_aware(start, end)
+        if end - start > MAX_FIND_SLOTS_RANGE:
+            raise ValueError(f"Range too large: max {MAX_FIND_SLOTS_RANGE.days} days.")
+        self._simulate_network()
+        if practitioner_ref not in self._practitioners:
+            return []
+        now = self._now()
+        with self._lock:
+            taken = self._taken_starts(practitioner_ref)
+        return [
+            slot
+            for slot in _office_slots(practitioner_ref, start, end)
+            if slot.starts_at > now
+            and slot.starts_at not in taken
+            and not self._is_taken_by_others(practitioner_ref, slot.starts_at)
+        ]
+
+    def book(self, practitioner_ref: str, starts_at: datetime, patient_ref: str) -> Booking:
+        _require_aware(starts_at)
+        self._simulate_network()
+        starts_at = starts_at.astimezone(UTC)
+        practitioner = self._practitioners.get(practitioner_ref)
+        if practitioner is None or not _is_office_slot(starts_at) or starts_at <= self._now():
+            raise SlotUnavailableError("No such slot.")
+        if self._is_taken_by_others(practitioner_ref, starts_at):
+            raise SlotUnavailableError("Slot already booked by another patient.")
+        with self._lock:
+            existing = self._booking_at(practitioner_ref, starts_at)
+            if existing is not None:
+                # Same patient asking again (e.g. a confirm retry after a lost
+                # response) gets back their own booking instead of an error;
+                # anyone else gets the usual conflict.
+                if existing.patient_ref == patient_ref:
+                    return existing
+                raise SlotUnavailableError("Slot already booked.")
+            booking = Booking(
+                external_ref=f"mock-appt-{uuid.uuid4().hex[:12]}",
+                practitioner_ref=practitioner_ref,
+                starts_at=starts_at,
+                ends_at=starts_at + SLOT_LENGTH,
+                location=practitioner.location,
+                patient_ref=patient_ref,
+            )
+            self._bookings[booking.external_ref] = booking
+        return booking
 
     def cancel(self, booking_ref: str) -> None:
         self._simulate_network()
-        self._bookings.pop(booking_ref, None)
+        with self._lock:
+            self._bookings.pop(booking_ref, None)
 
-    def _slots_on(self, practitioner_ref: str, day: date) -> list[Slot]:
-        if day.weekday() >= 5:  # Saturday, Sunday
-            return []
-        slots = []
-        for opens, closes in WORKING_HOURS:
-            local = datetime.combine(day, opens, self.clinic_tz)
-            closing = datetime.combine(day, closes, self.clinic_tz)
-            while local + self.slot_length <= closing:
-                start = local.astimezone(UTC)
-                if not _taken_by_someone_else(practitioner_ref, start):
-                    slots.append(
-                        Slot(
-                            id=make_slot_id(practitioner_ref, start),
-                            practitioner_ref=practitioner_ref,
-                            start=start,
-                            end=start + self.slot_length,
-                        )
-                    )
-                local += self.slot_length
-        return slots
+    # ---------- Helpers ----------
 
-    def _is_open(self, practitioner_ref: str, start: datetime) -> bool:
-        day = start.astimezone(self.clinic_tz).date()
-        return any(slot.start == start for slot in self._slots_on(practitioner_ref, day))
+    def _taken_starts(self, practitioner_ref: str) -> set[datetime]:
+        """Start times already booked with this doctor. Call while holding the lock."""
+        return {
+            b.starts_at for b in self._bookings.values() if b.practitioner_ref == practitioner_ref
+        }
+
+    def _booking_at(self, practitioner_ref: str, starts_at: datetime) -> Booking | None:
+        """The booking (if any) for this doctor's slot. Call while holding the lock."""
+        for booking in self._bookings.values():
+            if booking.practitioner_ref == practitioner_ref and booking.starts_at == starts_at:
+                return booking
+        return None
+
+    def _is_taken_by_others(self, practitioner_ref: str, starts_at: datetime) -> bool:
+        return self._pre_taken_slots and _taken_by_other_patients(practitioner_ref, starts_at)
 
     def _simulate_network(self) -> None:
-        if self.latency_seconds:
-            time.sleep(self.latency_seconds)
-        if self.failure_rate and self._rng.random() < self.failure_rate:
-            raise ProviderUnavailable("mock provider failure")
-
-
-def _taken_by_someone_else(practitioner_ref: str, start: datetime) -> bool:
-    return zlib.crc32(f"{practitioner_ref}{start:%Y%m%dT%H%M}".encode()) % 4 == 0
+        """Pretend to be a real remote system: maybe slow, maybe down."""
+        if self._latency_seconds:
+            sleep(self._latency_seconds)
+        if self._failure_rate and self._random.random() < self._failure_rate:
+            raise ProviderUnavailableError("Mock provider: simulated outage.")

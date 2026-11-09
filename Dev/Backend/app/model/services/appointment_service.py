@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
-from app.adapters.healthcare import HealthcareProvider, get_healthcare_provider
+from app.adapters.healthcare.interface import HealthcareProvider
 from app.model.entities import Appointment, Provider, User
 from app.model.repositories import appointments as repo
 
@@ -39,11 +39,11 @@ class AppointmentService:
         self,
         session: Session,
         *,
-        provider_api: HealthcareProvider | None = None,
+        healthcare: HealthcareProvider,
         clock: Callable[[], datetime] = _utcnow,
     ) -> None:
         self.session = session
-        self.provider_api = provider_api or get_healthcare_provider()
+        self.healthcare = healthcare
         self.clock = clock
 
     def find_providers(self, name: str | None = None) -> list[Provider]:
@@ -73,9 +73,9 @@ class AppointmentService:
             return []
         taken = repo.booked_starts(self.session, provider.id, start, end)
         options = []
-        for slot in self.provider_api.search_slots(provider.external_ref, start, end):
-            if slot.start not in taken:
-                options.append(SlotOption(slot.id, provider, slot.start, slot.end))
+        for slot in self.healthcare.find_slots(provider.external_ref, start, end):
+            if slot.starts_at not in taken:
+                options.append(SlotOption(slot.id, provider, slot.starts_at, slot.ends_at))
             if len(options) == limit:
                 break
         return options

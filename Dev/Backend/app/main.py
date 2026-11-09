@@ -8,8 +8,19 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.adapters.healthcare.interface import HealthcareProvider
+from app.adapters.healthcare.mock import MockHealthcareProvider
 from app.config import settings
-from app.controllers import actions, appointments, health, notifications
+from app.controllers import (
+    actions,
+    appointments,
+    auth,
+    consents,
+    health,
+    notifications,
+    older_adults,
+    users,
+)
 from app.controllers.conversation.endpoints import router as conversation_router
 from app.controllers.speech import router as speech_router
 from app.model import subscribers
@@ -24,9 +35,23 @@ async def lifespan(app: FastAPI):
         stop_worker.set()
 
 
+def build_healthcare_provider() -> HealthcareProvider:
+    """Factory: choose the doctor's-office system from settings (plan §4).
+
+    Only the mock exists today. A real FHIR client would be chosen here later,
+    and no other code would change.
+    """
+    return MockHealthcareProvider(
+        latency_ms=settings.mock_provider_latency_ms,
+        failure_rate=settings.mock_provider_failure_rate,
+    )
+
+
 def create_app() -> FastAPI:
     subscribers.register_all()  # e.g. booking an appointment schedules its reminders
     app = FastAPI(title="Voice Assistant for Older Adults", version="0.1.0", lifespan=lifespan)
+    # ONE shared doctor's office for all requests, so bookings are remembered.
+    app.state.healthcare = build_healthcare_provider()
 
     app.add_middleware(
         CORSMiddleware,
@@ -39,6 +64,10 @@ def create_app() -> FastAPI:
     # Kept at /api/health so the existing frontend keeps working.
     # Feature routers go under /api/v1.
     app.include_router(health.router, prefix="/api")
+    app.include_router(auth.router, prefix="/api/v1")
+    app.include_router(users.router, prefix="/api/v1")
+    app.include_router(older_adults.router, prefix="/api/v1")
+    app.include_router(consents.router, prefix="/api/v1")
     app.include_router(actions.router, prefix="/api/v1")
     app.include_router(appointments.router, prefix="/api/v1")
     app.include_router(notifications.router, prefix="/api/v1")

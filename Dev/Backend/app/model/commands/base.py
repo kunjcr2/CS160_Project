@@ -5,6 +5,7 @@ from typing import ClassVar
 
 from sqlalchemy.orm import Session
 
+from app.adapters.healthcare.interface import HealthcareProvider
 from app.model.entities import User
 
 
@@ -22,15 +23,19 @@ class ActionNotPossible(Exception):  # noqa: N818 (domain name, not a programmin
 
 class ActionCommand(ABC):
     """One user-confirmable action. Rebuilt from `pending_actions.payload` at confirm time,
-    so everything it needs must be in the payload (plain JSON values only).
+    so everything it needs must be in the payload (plain JSON values only). Outside
+    systems (the doctor's office) are passed in, never looked up globally.
     """
 
     action_type: ClassVar[str]  # stored in pending_actions.action_type
     reversible: ClassVar[bool] = False  # explicit capability (plan §4, LSP)
 
-    def __init__(self, user: User, payload: dict) -> None:
+    def __init__(
+        self, user: User, payload: dict, *, healthcare: HealthcareProvider | None = None
+    ) -> None:
         self.user = user
         self.payload = payload
+        self.healthcare = healthcare
 
     @abstractmethod
     def summary(self, session: Session) -> str:
