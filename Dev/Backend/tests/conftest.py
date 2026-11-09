@@ -1,7 +1,9 @@
 """Shared test setup. Tests use the separate voice_assistant_test database (plan §12)."""
 
 import os
+from datetime import date, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from dotenv import dotenv_values  # installed with pydantic-settings
 
@@ -19,10 +21,21 @@ from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
 from alembic import command  # noqa: E402
+from app.adapters.healthcare.mock import MockHealthcareProvider  # noqa: E402
+from app.controllers.dependencies import get_healthcare  # noqa: E402
 from app.db import SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
-from app.model.entities import Base, User  # noqa: E402
+from app.model.entities import Base, Provider, User  # noqa: E402
 from app.model.security import create_access_token  # noqa: E402
+
+LA = ZoneInfo("America/Los_Angeles")
+
+
+def next_tuesday() -> date:
+    """A Tuesday at least two days away (Los Angeles time), so every slot that day and
+    every reminder for it is in the future."""
+    day = datetime.now(LA).date() + timedelta(days=2)
+    return day + timedelta(days=(1 - day.weekday()) % 7)
 
 
 @pytest.fixture(scope="session")
@@ -71,3 +84,27 @@ def client(db):
     test_client.login_as = login_as
     yield test_client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def mock_provider():
+    """A fresh mock office, so bookings don't leak between tests. The API gets it through
+    the Healthcare dependency; services in tests get it passed in."""
+    provider = MockHealthcareProvider()
+    app.dependency_overrides[get_healthcare] = lambda: provider
+    yield provider
+    app.dependency_overrides.pop(get_healthcare, None)
+
+
+@pytest.fixture
+def chen(db) -> Provider:
+    provider = Provider(
+        name="Dr. Lisa Chen",
+        specialty="Cardiology",
+        location="Valley Medical, Building B",
+        phone="408-555-0142",
+        external_ref="mock-prac-cardiology-1",  # a doctor the mock office knows
+    )
+    db.add(provider)
+    db.commit()
+    return provider

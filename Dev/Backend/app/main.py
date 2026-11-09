@@ -24,6 +24,7 @@ from app.controllers import (
 )
 from app.controllers.conversation.endpoints import router as conversation_router
 from app.controllers.speech import router as speech_router
+from app.model import subscribers
 from app.workers import reminders
 
 
@@ -48,6 +49,7 @@ def build_healthcare_provider() -> HealthcareProvider:
 
 
 def create_app() -> FastAPI:
+    subscribers.register_all()  # e.g. booking an appointment schedules its reminders
     app = FastAPI(title="Voice Assistant for Older Adults", version="0.1.0", lifespan=lifespan)
     # ONE shared doctor's office for all requests, so bookings are remembered.
     app.state.healthcare = build_healthcare_provider()

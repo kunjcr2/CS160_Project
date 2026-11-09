@@ -1,16 +1,14 @@
 """PB-01 booking (S2-09): Margaret's cardiology appointment is booked after a yes; a slot
 taken in the meantime is handled."""
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 import pytest
+from conftest import next_tuesday
 from sqlalchemy import func, select
 
 from app.adapters.healthcare.interface import ProviderUnavailableError
-from app.adapters.healthcare.mock import MockHealthcareProvider
-from app.controllers.dependencies import get_healthcare
-from app.main import app
 from app.model.entities import Appointment, Provider
 from app.model.services.action_service import ActionService
 from app.model.services.appointment_service import AppointmentService
@@ -21,33 +19,8 @@ LA = ZoneInfo("America/Los_Angeles")
 
 
 @pytest.fixture(autouse=True)
-def mock_provider():
-    """A fresh mock office for every test, so bookings don't leak between tests. The API
-    gets it through the Healthcare dependency; services in tests get it passed in."""
-    provider = MockHealthcareProvider()
-    app.dependency_overrides[get_healthcare] = lambda: provider
-    yield provider
-    app.dependency_overrides.pop(get_healthcare, None)
-
-
-@pytest.fixture
-def chen(db) -> Provider:
-    provider = Provider(
-        name="Dr. Lisa Chen",
-        specialty="Cardiology",
-        location="Valley Medical, Building B",
-        phone="408-555-0142",
-        external_ref="mock-prac-cardiology-1",  # a doctor the mock office knows
-    )
-    db.add(provider)
-    db.commit()
-    return provider
-
-
-def next_tuesday() -> date:
-    """A Tuesday at least two days away, so every slot that day is in the future."""
-    day = datetime.now(LA).date() + timedelta(days=2)
-    return day + timedelta(days=(1 - day.weekday()) % 7)
+def _fresh_provider(mock_provider):
+    """Every booking test gets its own mock provider (see conftest)."""
 
 
 def _appointments(db) -> int:
