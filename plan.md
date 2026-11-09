@@ -337,6 +337,12 @@ Implementation:
 - **Every query that returns user data filters by owner.** Never fetch by id alone (`GET /appointments/42` must check that appointment 42 belongs to the caller). Missing this check is the most common real-world API vulnerability (IDOR).
 - Write tests that try to read another user's data and expect `404` (preferred over `403`, so we don't leak existence).
 
+Known gaps (from PR #18 review):
+- Revoking an older adult's last `profile:manage` grant leaves nobody able to mint a new pairing code for them, until `POST /consents` (granting a *new* caregiver) exists. A lost device would leave that older adult stuck in the meantime.
+- `profile:manage` lets a caregiver pair their own device as the older adult, which is effectively full impersonation of that older adult. This goes around the caregiver/older-adult scope split, but is intended for now.
+- `medications:manage` does not imply `medications:read`. This is fail-closed (a manage-only grant can write but not list), so keep it in mind once the medication routes land.
+- `POST /auth/pair` has no rate limiting yet. It's unauthenticated with a 10^8 code space, so brute-forcing active codes is a real risk; adding a per-IP and global cap is a follow-up (same limiter proposed for login).
+
 ### 5.3 Confirmation before action (the most important backend design)
 
 Every action that changes the outside world goes through a **pending action**:
@@ -384,8 +390,11 @@ These aren't in the feature list, but the 7 features won't work without them.
 ### 6.2 Mock provider service (FHIR-shaped)
 Shape the mock data after real FHIR resources so the engineering is credible:
 `Practitioner`, `Slot`, `Appointment`, `MedicationRequest`, `Communication`.
+**`MedicationRequest` and `Communication` are deferred**: not needed for S2-05, and not built yet.
 - Add realistic **latency** and **random failures** (configurable). Our error paths need something to test against.
 - Put it behind an interface (`HealthcareProvider`) in `app/adapters/healthcare/`, with `MockHealthcareProvider` as the only implementation for now.
+- **Built (S2-05):** `interface.py` + `mock.py`. 3 fake doctors; slots Mon–Fri 9:00–17:00 Pacific, 30 min, no lunch slots; each slot has an id (`<doctor>|YYYYMMDDTHHMMZ`, read with `parse_slot_id`); about 1 in 4 slots are already taken by other patients (stable hash, same every run). Settings: `MOCK_PROVIDER_LATENCY_MS`, `MOCK_PROVIDER_FAILURE_RATE` (both off by default, both validated at startup so a bad `.env` fails with a named variable, not a bare crash on first use). `main.py` builds one shared instance; endpoints get it with the `Healthcare` dependency.
+- **Bookings are in-memory only, and this mock is single-process only.** They live in a plain dict inside the `MockHealthcareProvider` instance, not the database, so they're lost on every restart (or `--reload`) and never shared across `--workers`/processes. The **`appointments` table is the source of truth**, not the mock: cancelling or rebooking a ref the mock no longer remembers is treated as a no-op/free slot, never an error, since a restart is expected to desync the two.
 
 ### 6.3 Scheduler / background worker (needed by PB-02 and PB-03)
 Reminders must fire even when nobody is making a request. Recommended simple, robust design:
@@ -469,6 +478,7 @@ Who did what, when: logins, consent grants, every pending-action transition, car
 
 ### 6.12 Seed / demo data
 Seed Margaret's story: her cardiologist and physical therapist, four medications (two twice daily), open slots next week, a pharmacy of record, a caregiver (her son), and a support agent. The demo then has a real narrative. Use only mock/demo health information, never real patient data.
+- **Built (S2-05):** `python -m scripts.seed` creates the providers, Margaret, her son (caregiver, all scopes), and a support agent. Safe to run many times. Medications and the pharmacy are added in S2-06.
 
 ### 6.13 Observability
 Health endpoint (already exists), structured logs with a request id, and **no health data or audio in logs** (log ids, not content).
@@ -593,7 +603,7 @@ Also: list upcoming, cancel, reschedule (each needs confirmation).
 | HumanAssistanceRequest | requestId, userId, reason, status |
 | PendingAction | actionId, userId, actionType, summary, status, expiresAt (persisted Command, §4) |
 | Provider | providerId, name, specialty, location |
-| Slot | slotId, providerId, start, end, available (from the mock provider; not stored as a table) |
+| Slot | slotId, providerId, start, end (from the mock provider; not stored as a table). `available` is not a field: the mock's `find_slots` only ever returns free slots, so there's nothing to flag — deferred until a real provider needs it. |
 | ConsentGrant | grantId, olderAdultId, caregiverId, scopes |
 | Session | sessionId, userId, deviceLabel, expiresAt, revokedAt |
 
@@ -607,14 +617,14 @@ Conventions (implemented in `app/model/entities/`):
 - **Rules are enforced by the database where possible**, using partial unique indexes (below), so a bug in Python can't break them.
 - Constraint names follow one naming convention so migrations are readable.
 
-First tables built (Sprint 2, for PB-01 and PB-02): `providers`, `appointments`, `appointment_reminders`, `pending_actions`, plus a **placeholder** `users` that the auth owner replaces with the real one. The rest are still a draft.
+First tables built (Sprint 2, for PB-01 and PB-02): `providers`, `appointments`, `appointment_reminders`, `pending_actions`, plus the real `users` table (first Alembic migration, §18, §26). The rest are still a draft.
 
 | Table | Key columns | Domain entity / notes |
 |---|---|---|
 | `users` | email (nullable for older adults), password_hash (nullable), role, display_name, preferred_name, preferred_language, timezone, speech_rate | User |
 | `sessions` | user_id, refresh_token_hash, device_label, expires_at, revoked_at | Revocable logins |
 | `pairing_codes` | code_hash, older_adult_id, created_by, expires_at, used_at | One-time device setup |
-| `consent_grants` | older_adult_id, caregiver_id, scopes (text[]), granted_at, revoked_at | Never includes transcripts |
+| `consent_grants` | older_adult_id, caregiver_id, scopes (text[]), revoked_at (`created_at` = when granted) | Never includes transcripts. Scopes: `profile:manage`, `appointments:read`, `medications:read`, `medications:manage`. One active grant per pair. |
 | `contacts` | user_id, kind (emergency/doctor/pharmacy), name, phone | User contactInfo |
 | `providers` | name, specialty, location, phone, external_ref (unique) | Mirrors FHIR `Practitioner`. Time slots are **not** stored; they come from the mock provider. |
 | `appointments` | user_id, provider_id, starts_at, ends_at, location, status (`booked`/`cancelled`/`completed`), external_ref | Appointment. **No double-booking:** unique `(provider_id, starts_at) WHERE status = 'booked'`. |
@@ -640,8 +650,8 @@ All under `/api/v1`. All except auth and health require a valid access token. Ex
 |---|---|
 | Health | `GET /health` |
 | Auth | `POST /auth/register` (caregiver) · `POST /auth/login` · `POST /auth/refresh` · `POST /auth/logout` · `POST /auth/pairing-codes` · `POST /auth/pair` |
-| Users / profile | `GET /users/me` · `PATCH /users/me` |
-| Consent | `GET /consents` · `POST /consents` · `DELETE /consents/{id}` |
+| Users / profile | `GET /users/me` · `PATCH /users/me` · `POST /older-adults` (caregiver creates an older adult profile + a consent grant with `profile:manage`) |
+| Consent | `GET /consents` · `DELETE /consents/{id}` · *(later: `POST /consents` to add another caregiver)* |
 | AI / conversation | `POST /ai/process` (text in → reply, optional pending action) · `POST /ai/voice` (audio in → transcript, reply text, reply audio, optional pending action) · `POST /ai/tts` |
 | Actions (confirmation) | `POST /actions` (propose only, for the frontend and manual tests without the AI; never executes) · `GET /actions/pending` · `POST /actions/{id}/confirm` · `POST /actions/{id}/cancel` · `POST /actions/{id}/undo` |
 | Appointments | `GET /providers` · `GET /slots?provider_id&from&to` · `GET /appointments` · `GET /appointments/{id}` · *(create/cancel/reschedule via actions)* |
@@ -712,7 +722,7 @@ Dev/Backend/app/
 ├── workers/
 │   └── reminder_worker.py   # polls due reminders, publishes ReminderDue
 ├── alembic/                 # migrations; versions/ files are named by date (exists)
-├── scripts/seed.py          # Margaret demo data (stub)
+├── scripts/seed.py          # Margaret demo data: python -m scripts.seed
 ├── tests/                   # conftest.py always uses voice_assistant_test (exists)
 ├── alembic.ini
 ├── pyproject.toml           # pytest + ruff settings
@@ -927,9 +937,7 @@ Record any change to these dates or the cut order in the Decision Log (§23).
 - **Setup docs fixed:** `Dev/README.md` and `Dev/Backend/README.md` now have macOS and Windows commands (the old `.venv/bin/python.exe` path was wrong on both).
 - `.env.example` and `.gitignore` files added (backend and repo root).
 
-**Still to do before the first migration:**
-- Agree on the real `users` table with the auth owner and replace the placeholder in `app/model/entities/user.py`.
-- Run `alembic revision --autogenerate -m "initial tables"`, read the generated file, then `alembic upgrade head`.
+**First migration done:** the real `users` table (§9) replaced the placeholder, and `alembic revision --autogenerate -m "initial tables"` / `alembic upgrade head` ran clean (§26).
 
 **Remaining mismatches:**
 - Repository layout: §24 recommends `backend/`, `frontend/`, `docs/`, but the repo uses `Dev/Backend`, `Dev/Frontend`, `Sprints/`. Pick one and move once.
@@ -939,7 +947,7 @@ Record any change to these dates or the cut order in the Decision Log (§23).
 
 First backend steps (Sprint 2):
 1. ~~Replace Flask with FastAPI; keep `/api/health` working; add CORS for `http://127.0.0.1:5173`.~~ Done.
-2. ~~Install PostgreSQL locally (no Docker), add SQLAlchemy, Alembic, `.env.example`, and setup instructions in the README.~~ Done; first migration pending.
+2. ~~Install PostgreSQL locally (no Docker), add SQLAlchemy, Alembic, `.env.example`, and setup instructions in the README.~~ Done; first migration applied.
 3. Users, sessions, login, pairing (enough auth to protect endpoints).
 4. Adapter interfaces (`HealthcareProvider`, `LanguageModel`, speech) with mock/fake implementations + seed script.
 5. `pending_actions` as Commands: `ActionCommand` base, command registry, `ActionService.confirm()`, and the confirm endpoint.
@@ -1095,6 +1103,7 @@ Don't silently change major decisions. Update this file and the backlog.
 | Sprint 2 (proposed) | **PB-05 multilingual becomes a stretch goal**; English only first, designed to grow (§6.8) | Largest item (13 pts), touches every feature, lowest top-3 ranking; limited time | Proposed: needs team agreement (incl. Kunj) |
 | Sprint 2 | **Application finished by end of week 12 (Nov 8)**: all features except PB-05, implemented and debugged; feature freeze Nov 4; week 13 for demo preparation (§17) | Course has three implementation sprints left; leaves a buffer week before demos | Active |
 | Sprint 2 | User-facing backend text in one file, `views/messages.py` (replaces planned `views/i18n/`) | No translations needed now; one place to reword after usability tests and to translate later | Active |
+| Sprint 2 (Oct 15) | **One mock provider:** keep Zohreh's S2-05 `HealthcareProvider` / `MockHealthcareProvider` as the base, plus Amar's slot id and pre-taken slots; Amar's booking code switches to it | Avoids two competing mocks; settings from `.env`, injected with `Depends`, doctor list for the seed, own tests; Amar's ideas make the demo realistic | Agreed (Zohreh + Amar) |
 
 Add rows whenever a major project decision changes.
 
@@ -1174,7 +1183,7 @@ Don't commit real secrets, private health information, or unnecessary generated 
 - [x] `.gitignore` configured
 - [ ] Secret-management approach agreed (`.env` + `.env.example` added; team to confirm)
 - [x] First implementation features selected: PB-01 booking + PB-02 appointment reminders
-- [ ] Real `users` table agreed and first Alembic migration applied
+- [x] Real `users` table agreed and first Alembic migration applied
 - [ ] Team agreement on PB-05 as a stretch goal
 - [ ] Acceptance criteria for first feature reviewed
 - [ ] Tasks assigned to every member for the implementation sprint

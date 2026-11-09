@@ -1,6 +1,6 @@
 """Every sentence the backend says to the user, in one place (English only for now).
 
-Keep wording short and plain (plan §13); reword freely after usability tests.
+Keep wording short and plain; reword freely after usability tests.
 Services fill the {placeholders} with str.format(). Multilingual support (PB-05)
 is deferred; if it returns, this file becomes the English template set.
 """
@@ -20,20 +20,25 @@ REMINDERS = {
     "hour_before": "Your appointment with {doctor} is in one hour, at {location}.",
 }
 
-# Confirmation (plan §5.3)
+# Confirmation
 CONFIRM_UNCLEAR = "I didn't catch a yes or a no. Should I go ahead?"
 ACTION_CANCELLED = "Okay, I won't do that."
 ACTION_EXPIRED = "That request timed out, so I didn't do anything. We can start again."
 ACTION_ALREADY_DONE = "That's already done."
 ACTION_NOT_PENDING = "That request is no longer waiting for an answer, so I didn't do anything."
 
-# Errors and fallback (plan §7)
+# Errors and fallback
 NOT_UNDERSTOOD = "Sorry, I didn't understand. Could you say that another way?"
 OFFER_HUMAN_HELP = "I'm having trouble with this. Would you like me to connect you with a person?"
 SERVICE_UNAVAILABLE = "Something went wrong on my end, and nothing was changed. Please try again."
 
+# Sign-in
+PAIRING_CODE_INVALID = "That code didn't work. Please ask your helper for a new one."
+
 # Conversation (SR-08). These replies accompany proposals only; another controller
 # will persist and confirm any action before it can be carried out.
 APPOINTMENT_REQUEST_RECEIVED = "I can help you find an appointment. Which doctor should I look for?"
-MEDICATION_REQUEST_RECEIVED = "I can help set a medication reminder. What medicine and what time should I use?"
+MEDICATION_REQUEST_RECEIVED = (
+    "I can help set a medication reminder. What medicine and what time should I use?"
+)
 AI_UNAVAILABLE = "I can't reach the assistant right now. Please try again."

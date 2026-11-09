@@ -10,7 +10,7 @@ from datetime import timedelta
 from fastapi import APIRouter, HTTPException, status
 
 from app.config import settings
-from app.controllers.dependencies import CurrentUser, SessionDep
+from app.controllers.dependencies import CurrentUser, Db
 from app.model.commands import ActionNotPossible, UnknownActionType
 from app.model.services.action_service import ActionNotFound, ActionNotPending, ActionService
 from app.views import messages
@@ -30,7 +30,7 @@ def _not_found() -> HTTPException:
 
 
 @router.post("", response_model=ActionOut, status_code=status.HTTP_201_CREATED)
-def propose_action(body: ProposeActionIn, user: CurrentUser, session: SessionDep) -> ActionOut:
+def propose_action(body: ProposeActionIn, user: CurrentUser, session: Db) -> ActionOut:
     """Create a proposal to read back to the user. This never executes anything.
 
     The conversation controller proposes actions itself; this endpoint lets the frontend
@@ -52,14 +52,14 @@ def propose_action(body: ProposeActionIn, user: CurrentUser, session: SessionDep
 
 
 @router.get("/pending", response_model=PendingActionOut)
-def get_pending_action(user: CurrentUser, session: SessionDep) -> PendingActionOut:
+def get_pending_action(user: CurrentUser, session: Db) -> PendingActionOut:
     action = _service(session).get_pending(user)
     session.commit()  # saves an `expired` status if the proposal just timed out
     return PendingActionOut(action=ActionOut.from_entity(action) if action else None)
 
 
 @router.post("/{action_id}/confirm", response_model=ActionOutcomeOut)
-def confirm_action(action_id: uuid.UUID, user: CurrentUser, session: SessionDep):
+def confirm_action(action_id: uuid.UUID, user: CurrentUser, session: Db):
     """The user said yes. Safe to call twice: it never executes twice.
 
     200 with status `executed` or `failed` (the message explains the failure) ·
@@ -82,7 +82,7 @@ def confirm_action(action_id: uuid.UUID, user: CurrentUser, session: SessionDep)
 
 
 @router.post("/{action_id}/cancel", response_model=ActionOutcomeOut)
-def cancel_action(action_id: uuid.UUID, user: CurrentUser, session: SessionDep):
+def cancel_action(action_id: uuid.UUID, user: CurrentUser, session: Db):
     """The user said no. 404 not found or not yours · 409 already executed, failed, or
     expired."""
     try:
