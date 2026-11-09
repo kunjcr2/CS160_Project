@@ -28,6 +28,8 @@ MEDICATION_NOT_CHANGEABLE = "This reminder can't be changed anymore."
 CONFIRM_UNCLEAR = "I didn't catch a yes or a no. Should I go ahead?"
 ACTION_CANCELLED = "Okay, I won't do that."
 ACTION_EXPIRED = "That request timed out, so I didn't do anything. We can start again."
+ACTION_ALREADY_DONE = "That's already done."
+ACTION_NOT_PENDING = "That request is no longer waiting for an answer, so I didn't do anything."
 
 # Errors and fallback
 NOT_UNDERSTOOD = "Sorry, I didn't understand. Could you say that another way?"

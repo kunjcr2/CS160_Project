@@ -653,7 +653,7 @@ All under `/api/v1`. All except auth and health require a valid access token. Ex
 | Users / profile | `GET /users/me` · `PATCH /users/me` · `POST /older-adults` (caregiver creates an older adult profile + a consent grant with `profile:manage`) |
 | Consent | `GET /consents` · `DELETE /consents/{id}` · *(later: `POST /consents` to add another caregiver)* |
 | AI / conversation | `POST /ai/process` (text in → reply, optional pending action) · `POST /ai/voice` (audio in → transcript, reply text, reply audio, optional pending action) · `POST /ai/tts` |
-| Actions (confirmation) | `GET /actions/pending` · `POST /actions/{id}/confirm` · `POST /actions/{id}/cancel` · `POST /actions/{id}/undo` |
+| Actions (confirmation) | `POST /actions` (propose only, for the frontend and manual tests without the AI; never executes) · `GET /actions/pending` · `POST /actions/{id}/confirm` · `POST /actions/{id}/cancel` · `POST /actions/{id}/undo` |
 | Appointments | `GET /providers` · `GET /slots?provider_id&from&to` · `GET /appointments` · `GET /appointments/{id}` · *(create/cancel/reschedule via actions)* |
 | Appointment reminders | `GET /appointment-reminders` · `PATCH /appointment-reminders/settings` |
 | Medications | `GET /older-adults/{id}/medications` (`medications:read`) · `POST /older-adults/{id}/medications` (`medications:manage`; creates doses right away) · `GET /older-adults/{id}/medication-reminders?date=` (`medications:read`; local date, default today) · `POST /medication-reminders/{id}/taken` · `POST /medication-reminders/{id}/missed` (taken/missed: only the older adult; 409 `too_early` more than 1 h before the dose). Paths include the older adult's id so caregivers use the same endpoints under the consent rules (§5.2). |
