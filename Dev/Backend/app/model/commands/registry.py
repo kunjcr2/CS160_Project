@@ -4,6 +4,7 @@ A new feature action is one new Command class decorated with @register (plan §4
 Open-Closed): ActionService never changes.
 """
 
+from app.adapters.healthcare.interface import HealthcareProvider
 from app.model.entities import User
 
 from .base import ActionCommand
@@ -20,12 +21,18 @@ def register(command_class: type[ActionCommand]) -> type[ActionCommand]:
     return command_class
 
 
-def build(action_type: str, user: User, payload: dict) -> ActionCommand:
+def build(
+    action_type: str,
+    user: User,
+    payload: dict,
+    *,
+    healthcare: HealthcareProvider | None = None,
+) -> ActionCommand:
     try:
         command_class = _commands[action_type]
     except KeyError:
         raise UnknownActionType(action_type) from None
-    return command_class(user, payload)
+    return command_class(user, payload, healthcare=healthcare)
 
 
 def registered_types() -> list[str]:
