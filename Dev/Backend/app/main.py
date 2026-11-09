@@ -17,6 +17,7 @@ from app.controllers import (
     auth,
     consents,
     health,
+    medications,
     notifications,
     older_adults,
     users,
@@ -66,6 +67,7 @@ def create_app() -> FastAPI:
     app.include_router(users.router, prefix="/api/v1")
     app.include_router(older_adults.router, prefix="/api/v1")
     app.include_router(consents.router, prefix="/api/v1")
+    app.include_router(medications.router, prefix="/api/v1")
     app.include_router(actions.router, prefix="/api/v1")
     app.include_router(appointments.router, prefix="/api/v1")
     app.include_router(notifications.router, prefix="/api/v1")
