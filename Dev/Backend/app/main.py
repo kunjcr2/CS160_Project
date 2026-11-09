@@ -9,7 +9,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.adapters.healthcare.interface import HealthcareProvider
 from app.adapters.healthcare.mock import MockHealthcareProvider
 from app.config import settings
-from app.controllers import actions, auth, consents, health, medications, older_adults, users
+from app.controllers import (
+    actions,
+    appointments,
+    auth,
+    consents,
+    health,
+    medications,
+    older_adults,
+    users,
+)
 from app.controllers.conversation.endpoints import router as conversation_router
 from app.controllers.speech import router as speech_router
 
@@ -48,6 +57,7 @@ def create_app() -> FastAPI:
     app.include_router(consents.router, prefix="/api/v1")
     app.include_router(medications.router, prefix="/api/v1")
     app.include_router(actions.router, prefix="/api/v1")
+    app.include_router(appointments.router, prefix="/api/v1")
     app.include_router(conversation_router, prefix="/api/v1")
     app.include_router(speech_router, prefix="/api/v1")
 
