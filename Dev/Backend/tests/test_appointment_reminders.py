@@ -30,13 +30,13 @@ def _reminders(db, appointment_id) -> dict[str, AppointmentReminder]:
     return {row.kind: row for row in rows}
 
 
-def _book(db, user, provider) -> Appointment:
+def _book(db, user, provider, office) -> Appointment:
     """Book next Tuesday's first slot from 10 AM on (late enough for all three reminders)."""
-    slots = AppointmentService(db).find_slots(
+    slots = AppointmentService(db, healthcare=office).find_slots(
         user, provider, next_tuesday(), next_tuesday(), limit=20
     )
     slot = next(s for s in slots if s.starts_at.astimezone(ZoneInfo(LA)).hour >= 10)
-    actions = ActionService(db)
+    actions = ActionService(db, healthcare=office)
     action = actions.propose(user, "book_appointment", {"slot_id": slot.slot_id})
     outcome = actions.confirm(action.id, user)
     db.commit()
@@ -90,8 +90,8 @@ def test_no_morning_of_reminder_for_an_early_appointment():
 # --- Created on booking, cancelled with the appointment ---------------------------------
 
 
-def test_booking_creates_three_reminders(db, make_user, chen):
-    appointment = _book(db, make_user(), chen)
+def test_booking_creates_three_reminders(db, make_user, chen, mock_provider):
+    appointment = _book(db, make_user(), chen, mock_provider)
 
     reminders = _reminders(db, appointment.id)
     assert set(reminders) == {"day_before", "morning_of", "hour_before"}
@@ -100,8 +100,8 @@ def test_booking_creates_three_reminders(db, make_user, chen):
     assert {r.status for r in reminders.values()} == {"scheduled"}
 
 
-def test_running_the_subscriber_twice_creates_no_duplicates(db, make_user, chen):
-    appointment = _book(db, make_user(), chen)
+def test_running_the_subscriber_twice_creates_no_duplicates(db, make_user, chen, mock_provider):
+    appointment = _book(db, make_user(), chen, mock_provider)
     before = len(_reminders(db, appointment.id))
 
     on_appointment_booked(db, AppointmentBooked(appointment.id, appointment.user_id))
@@ -110,8 +110,8 @@ def test_running_the_subscriber_twice_creates_no_duplicates(db, make_user, chen)
     assert len(_reminders(db, appointment.id)) == before
 
 
-def test_reminders_already_in_the_past_are_skipped(db, make_user, chen, monkeypatch):
-    appointment = _book(db, make_user(), chen)
+def test_reminders_already_in_the_past_are_skipped(db, make_user, chen, monkeypatch, mock_provider):
+    appointment = _book(db, make_user(), chen, mock_provider)
     db.execute(AppointmentReminder.__table__.delete())
     # Pretend the booking happened 30 minutes before the appointment.
     monkeypatch.setattr(
@@ -125,8 +125,8 @@ def test_reminders_already_in_the_past_are_skipped(db, make_user, chen, monkeypa
     assert _reminders(db, appointment.id) == {}
 
 
-def test_cancelled_appointment_gets_no_reminders(db, make_user, chen):
-    appointment = _book(db, make_user(), chen)
+def test_cancelled_appointment_gets_no_reminders(db, make_user, chen, mock_provider):
+    appointment = _book(db, make_user(), chen, mock_provider)
     day_before = _reminders(db, appointment.id)["day_before"]
     day_before.status = "sent"  # one was already sent before the cancellation
     appointment.status = "cancelled"
@@ -143,9 +143,11 @@ def test_cancelled_appointment_gets_no_reminders(db, make_user, chen):
 # --- End to end: book, worker fires, banner shows it ------------------------------------
 
 
-def test_booked_appointment_reminder_reaches_the_screen(client, db, make_user, chen, monkeypatch):
+def test_booked_appointment_reminder_reaches_the_screen(
+    client, db, make_user, chen, monkeypatch, mock_provider
+):
     margaret = make_user()
-    appointment = _book(db, margaret, chen)
+    appointment = _book(db, margaret, chen, mock_provider)
     day_before = reminder_times(appointment.starts_at, LA)["day_before"]
 
     assert run_once(now=day_before - timedelta(seconds=1)) == {"appointment_reminder": 0}

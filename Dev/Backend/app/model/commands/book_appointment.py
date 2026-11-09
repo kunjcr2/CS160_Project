@@ -10,11 +10,11 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.adapters.healthcare import (
-    ProviderUnavailable,
+from app.adapters.healthcare.interface import (
+    HealthcareProvider,
+    ProviderUnavailableError,
     Slot,
-    SlotUnavailable,
-    get_healthcare_provider,
+    SlotUnavailableError,
     parse_slot_id,
 )
 from app.model.entities import Appointment, Provider, User
@@ -46,14 +46,15 @@ class BookAppointment(ActionCommand):
     action_type = "book_appointment"
     reversible = False  # undo is cancel (Sprint 3), a separate confirmed action
 
-    def __init__(self, user: User, payload: dict) -> None:
-        super().__init__(user, payload)
+    def __init__(
+        self, user: User, payload: dict, *, healthcare: HealthcareProvider | None = None
+    ) -> None:
+        super().__init__(user, payload, healthcare=healthcare)
         self.slot_id = str(payload.get("slot_id", ""))
         try:
             self.practitioner_ref, self.start = parse_slot_id(self.slot_id)
         except ValueError:
             self.practitioner_ref, self.start = None, None
-        self.api = get_healthcare_provider()
 
     def summary(self, session: Session) -> str:
         provider = self._provider(session)
@@ -78,8 +79,8 @@ class BookAppointment(ActionCommand):
         appointment = Appointment(
             user_id=self.user.id,
             provider_id=provider.id,
-            starts_at=slot.start,
-            ends_at=slot.end,
+            starts_at=slot.starts_at,
+            ends_at=slot.ends_at,
             location=provider.location,
             status="booked",
         )
@@ -90,22 +91,25 @@ class BookAppointment(ActionCommand):
             raise ActionNotPossible("slot_taken", messages.BOOKING_SLOT_TAKEN_NO_OPTIONS) from None
 
         try:
-            appointment.external_ref = self.api.book(slot.id, patient_ref=str(self.user.id))
-        except SlotUnavailable:
+            booking = self.healthcare.book(
+                provider.external_ref, slot.starts_at, patient_ref=str(self.user.id)
+            )
+        except SlotUnavailableError:
             raise self._slot_taken(session, provider) from None
-        except ProviderUnavailable:
+        except ProviderUnavailableError:
             raise _provider_unavailable(provider) from None
+        appointment.external_ref = booking.external_ref
 
         try:
             session.flush()
             events.publish(session, AppointmentBooked(appointment.id, self.user.id))
         except Exception:
-            self.api.cancel(appointment.external_ref)  # don't leave a booking we don't record
+            self.healthcare.cancel(appointment.external_ref)  # don't keep an unrecorded booking
             raise
         return {
             "appointment_id": str(appointment.id),
             "provider_name": provider.name,
-            "starts_at": slot.start.isoformat(),
+            "starts_at": slot.starts_at.isoformat(),
         }
 
     def success_message(self, result: dict) -> str:
@@ -125,13 +129,18 @@ class BookAppointment(ActionCommand):
     def _free_slot(self, session: Session, provider: Provider) -> Slot:
         if self.start <= datetime.now(UTC):
             raise _slot_unknown()
-        window_end = self.start + timedelta(minutes=1)
         try:
-            found = self.api.search_slots(provider.external_ref, self.start, window_end)
-        except ProviderUnavailable:
+            # find_slots returns slots that END inside the window, so leave room for one.
+            found = self.healthcare.find_slots(
+                provider.external_ref, self.start, self.start + timedelta(hours=1)
+            )
+        except ProviderUnavailableError:
             raise _provider_unavailable(provider) from None
         free = [slot for slot in found if slot.id == self.slot_id]
-        if not free or repo.booked_starts(session, provider.id, self.start, window_end):
+        booked = repo.booked_starts(
+            session, provider.id, self.start, self.start + timedelta(minutes=1)
+        )
+        if not free or booked:
             raise self._slot_taken(session, provider)
         return free[0]
 
@@ -139,10 +148,10 @@ class BookAppointment(ActionCommand):
         """Explain, and offer the next free times with the same doctor this week."""
         day = self.start.astimezone(ZoneInfo(self.user.timezone)).date()
         try:
-            options = AppointmentService(session).find_slots(
+            options = AppointmentService(session, healthcare=self.healthcare).find_slots(
                 self.user, provider, day, day + timedelta(days=7)
             )
-        except ProviderUnavailable:
+        except ProviderUnavailableError:
             options = []
         if not options:
             return ActionNotPossible("slot_taken", messages.BOOKING_SLOT_TAKEN_NO_OPTIONS)
