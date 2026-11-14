@@ -11,7 +11,14 @@ const labels = {
   failed: "Delivery failed",
 };
 
-export default function ReminderBanner({ reminder, busy, disabled, onAnswer }) {
+export default function ReminderBanner({
+  reminder,
+  busy,
+  disabled,
+  onAnswer,
+  timeZone,
+  canAnswerMedication = true,
+}) {
   const medication = reminder.kind === "medication_reminder";
   const Icon = medication ? Pill : CalendarDays;
   return (
@@ -36,8 +43,13 @@ export default function ReminderBanner({ reminder, busy, disabled, onAnswer }) {
         <p className="dosage">{reminder.dosage}</p>
       )}
       <p className="reminder-message">{reminder.message}</p>
-      <time dateTime={reminder.due_at}>{formatWhen(reminder.due_at)}</time>
-      {reminder.status === "sent" && (
+      {reminder.attempts === 2 && (
+        <p className="quiet-label">Second reminder</p>
+      )}
+      <time dateTime={reminder.due_at}>
+        {formatWhen(reminder.due_at, timeZone)}
+      </time>
+      {reminder.status === "sent" && (!medication || canAnswerMedication) && (
         <div className="button-row">
           {medication ? (
             <>

@@ -27,10 +27,10 @@ test("notification IDs stay separate from medication reminder IDs", () => {
   ]);
   assert.equal(row.id, "dose-1");
   assert.equal(row.notification_id, "notice-1");
-  assert.throws(
-    () =>
-      normalizeNotifications([{ ...reminder, kind: "medication_reminder" }]),
-    /reminder ID/,
+  assert.equal(
+    normalizeNotifications([{ ...reminder, kind: "medication_reminder" }])[0]
+      .id,
+    "dose-1",
   );
 });
 
@@ -121,51 +121,26 @@ test("action success must be explicitly confirmed by the server", async () => {
   await assert.rejects(api.resolveAction("action-1", "confirm"), /verify/);
 });
 
-test("SSE reconnects trigger snapshot recovery and subscriptions close", () => {
-  const Original = globalThis.EventSource;
-  let source;
-  globalThis.EventSource = class {
-    constructor(path, options) {
-      this.path = path;
-      this.options = options;
-      this.events = {};
-      source = this;
-    }
-    addEventListener(name, fn) {
-      this.events[name] = fn;
-    }
-    close() {
-      this.closed = true;
-    }
-  };
-  try {
-    let refreshes = 0;
-    const states = [];
-    const close = createApi({ streamPath: "/notifications/stream" }).subscribe(
-      () => refreshes++,
-      (value) => states.push(value),
-    );
-    source.onopen();
-    source.onmessage();
-    source.onerror();
-    source.onopen();
-    source.events.reminder_updated();
-    assert.equal(refreshes, 4);
-    assert.deepEqual(states, [
-      "connecting",
-      "connected",
-      "reconnecting",
-      "connected",
-    ]);
-    assert.equal(source.options.withCredentials, true);
-    close();
-    assert.equal(source.closed, true);
-  } finally {
-    globalThis.EventSource = Original;
-  }
+test("polling waits for refresh and subscriptions close", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  let refreshes = 0;
+  const states = [];
+  const close = createApi().subscribe(
+    async () => {
+      refreshes++;
+    },
+    (state) => states.push(state),
+  );
+  t.mock.timers.tick(20000);
+  await Promise.resolve();
+  assert.equal(refreshes, 1);
+  assert.deepEqual(states, ["polling"]);
+  close();
+  t.mock.timers.tick(60000);
+  assert.equal(refreshes, 1);
 });
 
-test("appointment OK uses the notification ID and verifies refreshed status", async () => {
+test("appointment OK uses the reminder ID and verifies returned status", async () => {
   const calls = [];
   const appointment = {
     ...reminder,
@@ -175,18 +150,168 @@ test("appointment OK uses the notification ID and verifies refreshed status", as
   const api = createApi({
     fetchImpl: async (path) => {
       calls.push(path);
-      return path.endsWith("/ack")
-        ? json({})
-        : json([
-            {
-              id: "notice-2",
-              kind: "appointment_reminder",
-              payload: { ...reminder, status: "acknowledged" },
-            },
-          ]);
+      return json({
+        ...reminder,
+        kind: "appointment_reminder",
+        status: "acknowledged",
+      });
     },
   });
   const updated = await api.answerReminder(appointment, "acknowledged");
-  assert.deepEqual(calls, ["/notifications/notice-2/ack", "/notifications"]);
+  assert.deepEqual(calls, ["/api/v1/appointment-reminders/dose-1/acknowledge"]);
   assert.equal(updated.status, "acknowledged");
+});
+
+test("AI intent remains readable but is never treated as a persisted action", () => {
+  const result = normalizeReply({
+    reply: "Let's find a doctor.",
+    proposal: { kind: "appointment", doctor: "Chen", date_hint: "tomorrow" },
+  });
+  assert.equal(result.proposal, null);
+  assert.match(result.notice, /No appointment or reminder has been saved/);
+  assert.equal(result.text, "Let's find a doctor.");
+});
+
+test("persisted action summary_text and wrapped confirmation are accepted", async () => {
+  assert.equal(
+    normalizeReply({
+      reply: "Review",
+      pending_action: { id: "a1", summary_text: "Book visit" },
+    }).proposal.summary,
+    "Book visit",
+  );
+  const api = createApi({
+    fetchImpl: async () =>
+      json({ action: { id: "a1", status: "executed" }, message: "Booked" }),
+  });
+  assert.equal((await api.resolveAction("a1", "confirm")).status, "executed");
+  const failed = createApi({
+    fetchImpl: async () =>
+      json({
+        action: { id: "a1", status: "failed" },
+        message: "Slot is unavailable",
+      }),
+  });
+  await assert.rejects(
+    failed.resolveAction("a1", "confirm"),
+    /Slot is unavailable/,
+  );
+});
+
+test("medication dose response need not contain a message; structured errors survive", async () => {
+  const { message, ...dose } = reminder;
+  const api = createApi({
+    fetchImpl: async () => json({ ...dose, status: "taken" }),
+  });
+  const result = await api.answerReminder(
+    { ...reminder, kind: "medication_reminder" },
+    "taken",
+  );
+  assert.equal(result.message, message);
+  const failed = createApi({
+    fetchImpl: async () =>
+      json(
+        { detail: { code: "too_early", message: "This dose is not due yet." } },
+        409,
+      ),
+  });
+  await assert.rejects(
+    failed.answerReminder(
+      { ...reminder, kind: "medication_reminder" },
+      "taken",
+    ),
+    (error) =>
+      error.code === "too_early" &&
+      error.message === "This dose is not due yet.",
+  );
+});
+
+test("speech uses multipart audio and MP3 response without JSON decoding", async () => {
+  const calls = [];
+  const api = createApi({
+    getAccessToken: () => "test-token",
+    fetchImpl: async (path, options) => {
+      calls.push([path, options]);
+      return path.endsWith("/transcribe")
+        ? json({ text: " Hello " })
+        : new Response(new Uint8Array([1, 2, 3]), {
+            headers: { "content-type": "audio/mpeg" },
+          });
+    },
+  });
+  assert.equal(
+    await api.transcribe(new Blob(["audio"], { type: "audio/mp4" })),
+    "Hello",
+  );
+  const [path, options] = calls[0];
+  assert.equal(path, "/api/v1/ai/transcribe");
+  assert.equal(options.body.get("audio").name, "recording.m4a");
+  assert.equal(options.headers["Content-Type"], undefined);
+  assert.equal(options.headers.Authorization, "Bearer test-token");
+  assert.equal((await api.synthesize("Hello")).type, "audio/mpeg");
+  assert.deepEqual(JSON.parse(calls[1][1].body), { text: "Hello" });
+});
+
+test("empty/overlong transcripts and non-audio TTS responses fail explicitly", async () => {
+  for (const text of ["", " ", "x".repeat(2001)]) {
+    const api = createApi({ fetchImpl: async () => json({ text }) });
+    await assert.rejects(api.transcribe(new Blob(["audio"])), /speech|long/);
+  }
+  const api = createApi({
+    fetchImpl: async () => json({ reply: "not audio" }),
+  });
+  await assert.rejects(api.synthesize("Hello"), /unexpected/);
+});
+
+test("session refresh supplies Bearer token and logout accepts 204", async () => {
+  const calls = [];
+  const api = createApi({
+    fetchImpl: async (path, options) => {
+      calls.push([path, options]);
+      if (path.endsWith("/refresh")) return json({ access_token: "fresh" });
+      if (path.endsWith("/logout")) return new Response(null, { status: 204 });
+      return json({ id: "user-1", role: "older_adult" });
+    },
+  });
+  assert.equal((await api.restoreSession()).id, "user-1");
+  assert.equal(calls[1][1].headers.Authorization, "Bearer fresh");
+  await api.signOut();
+  assert.equal(calls[2][0], "/api/v1/auth/logout");
+});
+
+test("concurrent expired requests share one refresh and retry with the new token", async () => {
+  let refreshes = 0;
+  const api = createApi({
+    getAccessToken: () => "old",
+    fetchImpl: async (path, options) => {
+      if (path.endsWith("/refresh")) {
+        refreshes++;
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return json({ access_token: "new" });
+      }
+      return options.headers.Authorization === "Bearer new"
+        ? json([])
+        : json({}, 401);
+    },
+  });
+  await Promise.all([api.listNotifications(), api.listNotifications()]);
+  assert.equal(refreshes, 1);
+});
+
+test("failed refresh expires the session without retrying a mutation", async () => {
+  let expired = 0;
+  let posts = 0;
+  const api = createApi({
+    getAccessToken: () => "old",
+    onUnauthorized: () => expired++,
+    fetchImpl: async (path) => {
+      if (path.includes("/medication-reminders/")) posts++;
+      return json({}, 401);
+    },
+  });
+  await assert.rejects(
+    api.answerReminder({ ...reminder, kind: "medication_reminder" }, "taken"),
+  );
+  assert.equal(posts, 1);
+  assert.equal(expired, 1);
 });

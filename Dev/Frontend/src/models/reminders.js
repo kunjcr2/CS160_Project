@@ -47,8 +47,7 @@ export function normalizeReminder(value, kind = "medication_reminder") {
   return { ...value, kind };
 }
 
-// Notification IDs and medication reminder IDs are not interchangeable.
-// This envelope is provisional until the notification owner confirms the schema.
+// PR #13 uses flat items whose id is the reminder id. Retain old demo envelopes.
 export function normalizeNotifications(payload) {
   const rows = Array.isArray(payload) ? payload : payload?.notifications;
   if (!Array.isArray(rows))
@@ -60,7 +59,7 @@ export function normalizeNotifications(payload) {
     .map((row) => {
       const data = row.payload ?? row;
       const reminderId =
-        row.reminder_id ?? (row.payload ? row.payload.id : null);
+        row.reminder_id ?? (row.payload ? row.payload.id : row.id);
       if (typeof row.id !== "string" || !reminderId) {
         throw new Error(
           "A notification is missing its reminder ID. Please refresh and try again.",

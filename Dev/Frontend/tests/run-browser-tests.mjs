@@ -10,7 +10,14 @@ function startServer(port, mode) {
   return new Promise((done, reject) => {
     const child = spawn(process.execPath, ["node_modules/vite/bin/vite.js", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
       windowsHide: true,
-      env: { ...process.env, VITE_DATA_MODE: mode, VITE_NOTIFICATION_STREAM_PATH: "", VITE_NOTIFICATIONS_PATH: "/notifications", NO_COLOR: "1" },
+      env: {
+        ...process.env,
+        VITE_DATA_MODE: mode,
+        VITE_NOTIFICATIONS_PATH: "/api/v1/notifications",
+        // Each test server owns its optimizer cache, including on Windows.
+        CS160_VITE_CACHE_DIR: resolve(`.npm-cache/vite-tests-${process.pid}-${port}`),
+        NO_COLOR: "1",
+      },
       stdio: ["ignore", "pipe", "pipe"],
     });
     servers.push(child);
@@ -33,11 +40,27 @@ async function stop(child) {
   await exited;
 }
 
+async function buildOffline(mode) {
+  const child = spawn(process.execPath, [
+    "node_modules/vite/bin/vite.js", "build", "--outDir", `.npm-cache/offline-${mode}`,
+  ], {
+    windowsHide: true,
+    env: { ...process.env, VITE_DATA_MODE: mode, VITE_NOTIFICATIONS_PATH: "/api/v1/notifications" },
+    stdio: "inherit",
+  });
+  servers.push(child);
+  const [code] = await once(child, "exit");
+  if (code !== 0) throw new Error(`Offline ${mode} build failed (${code}).`);
+}
+
 process.on("SIGINT", () => { runner?.kill(); servers.forEach((child) => child.kill()); });
 process.on("SIGTERM", () => { runner?.kill(); servers.forEach((child) => child.kill()); });
 
 try {
-  await Promise.all([startServer(5180, "demo"), startServer(5181, "live")]);
+  if (process.env.PW_OFFLINE_BUILD === "1")
+    await Promise.all([buildOffline("demo"), buildOffline("live")]);
+  else
+    await Promise.all([startServer(5180, "demo"), startServer(5181, "live")]);
   runner = spawn(process.execPath, ["node_modules/@playwright/test/cli.js", "test", ...process.argv.slice(2)], {
     windowsHide: true,
     stdio: "inherit",

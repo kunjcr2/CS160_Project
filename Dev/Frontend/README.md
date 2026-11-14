@@ -1,8 +1,31 @@
 # Care Companion Frontend
 
-Sprint 2 conversation screen, confirmation card, and medication/appointment reminders.
+React/Vite conversation, confirmations, reminders, and the first Sprint 3 voice UI.
+
+## Status (November 13, 2026)
+
+| Area | Implemented locally | Remaining acceptance work |
+| --- | --- | --- |
+| S2-15 | Conversation UI; action response adapter for PR #11 | AI intent-to-persisted-action integration and real backend testing |
+| S2-16 | Notification polling; appointment OK; medication Taken/Missed; profile timezone and role checks | Shared Bearer authentication in Amar's controllers; medication source registration; real worker tests |
+| S2-17 | Exact direct dependency versions, lockfile, setup README | Review and merge |
+| Sprint 3 voice | Microphone capture, transcription review, reply playback, opt-in automatic reading, cancellation and text fallback | Test with real microphone, actual STT/TTS, and integrated backend |
+| Auth integration | Pairing/email sign-in; single-flight refresh; cross-tab cookie lock; stale-session protection | Real auth API acceptance after PR #17/#18 merge |
+| Sprint 3 remaining screens | Not implemented | Confirm Help, support queue, care messages and refill API contracts and team assignments |
+
+This implements the frontend against the reviewed PR code. It does not merge
+teammates' branches, migrate databases, or claim live end-to-end acceptance.
+Remote main now includes PR #5 (AI conversation and speech), in addition to the
+health endpoint. Auth, actions, and notifications are still in open PRs, so main
+alone cannot run this frontend's full live workflow. The local frontend branch
+has been merged with that main locally; the Python cache/virtualenv ignore rules
+from both branches were preserved. This branch includes the auth, reminder, and
+voice frontend updates for PR #20; live integration is still pending.
+Sprint 3 is not complete.
 
 ## Run Locally
+
+Use Node.js 22.12+ (or Node 20.19+) and npm. Browser tests use installed Chrome or Edge.
 
 ```powershell
 cd Dev/Frontend
@@ -10,107 +33,184 @@ npm ci
 npm run dev
 ```
 
-Open the URL printed by Vite (normally <http://127.0.0.1:5173>). Local development
-defaults to **demo mode**, with a visible sample-data notice. No backend, database,
-API key, or real patient data is needed. Demo changes live only in memory and reset
-on reload. The collapsed Demo controls can reset reminders, simulate a server-side
-missed dose, or fail the next request once to exercise retry behavior.
+Open the Vite URL, normally http://127.0.0.1:5173. Development defaults to **demo**
+with an explicit sample-data banner. No real data is saved. Demo reminder controls
+remain available; microphone and reply playback are disabled in demo because
+there is no speech backend. Live failures never fall back to demo.
 
-## Implemented
+Direct dependencies are exact versions. The lockfile is committed, and
+`.npmrc` has `save-exact=true`. Use `npm ci` for reproducible installation.
+Vite 8.3.5 includes the patch update made during the October 23 audit.
+Keep both manifests together when intentionally updating dependencies.
 
-- Conversation history, typed messages, waiting state and retry without duplicated messages.
-- Explicit confirmation/cancellation; a proposal blocks new messages until resolved.
-- Medication Taken/Missed buttons only for `sent`; no optimistic success or duplicate submissions.
-- Appointment reminders use OK and `acknowledged`, separately from medication reminders.
-- UTC timestamps rendered in the browser's local timezone, including DST.
-- Incoming reminder changes replace matching rows; new data is fetched on window focus.
-- 404/409 handling, retryable connection errors, and malformed-response rejection.
-- Keyboard controls, live announcements, 48px minimum buttons, larger text and responsive layout.
+## Live Setup
 
-## Live Integration Status
+Follow the [backend README](../Backend/README.md) for the virtual environment,
+PostgreSQL, migrations and server setup. A backend integration checkout must
+include the relevant PRs below. Do not bypass authorization with a development
+user header to make frontend integration appear complete.
 
-On October 15 the fetched `origin/main` was `ecb0277`. Its FastAPI app only mounts
-`/api/health`. The conversation, action and notification controllers are not in
-that checkout. **Live end-to-end integration is not verified.** Team chat supplied
-the medication contract; the notification envelope, action responses, auth and SSE
-details below are provisional and must be compared with the merged FastAPI `/docs`.
+Start FastAPI from Dev/Backend:
 
-Use `.env.local` with `VITE_DATA_MODE=live` to enable the HTTP adapter, then restart
-Vite. Production builds default to live unless `VITE_DATA_MODE=demo` is explicitly
-set during the build. Live failures never fall back to demo data.
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 5000
+```
 
-Configuration (also listed in `.env.example`):
+Set `VITE_DATA_MODE=live` in `.env.local`, then restart Vite. Live mode first
+restores a session, or displays pairing-code/email sign-in. Existing caregiver
+accounts and pairing codes must be created through the backend. Account creation
+and caregiver pairing-code issuance are not included in this UI.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `VITE_DATA_MODE` | demo in dev, live in build | Explicit data source |
-| `VITE_NOTIFICATIONS_PATH` | `/notifications` | Confirm full prefix with akiko; use `/api/v1/notifications` if needed |
-| `VITE_NOTIFICATION_STREAM_PATH` | empty | Optional SSE URL after confirming its contract |
+| VITE_DATA_MODE | demo in development; live in builds | Explicit data source |
+| VITE_NOTIFICATIONS_PATH | /api/v1/notifications | PR #13 notification feed |
 
-Vite proxies `/api` and `/notifications` to `http://127.0.0.1:5000`.
-Production hosting needs equivalent routing. No polling timer is assumed while
-the team finalizes delivery. With SSE unset, users can refresh and window focus
-also refreshes. With SSE enabled, opening/reconnecting or receiving `message`,
-`notification`, or `reminder_updated` triggers a GET snapshot. SSE payloads are
-not applied directly. Other event names or transports need adapter changes.
-Connections are closed on unmount. This does not provide notifications with the app closed.
+Vite proxies /api to http://127.0.0.1:5000. Production hosting needs equivalent
+same-origin routing and HTTPS for microphone capture. Localhost is supported.
+Never place an OpenAI key in a frontend environment variable.
+Use the running backend's /docs to verify what is actually mounted.
+A passing /api/health response does not verify feature readiness.
 
-### Notification Contract to Confirm
+## Reviewed API Contracts
 
-The adapter accepts a JSON array or `{ "notifications": [...] }`. Recognized kinds
-are `medication_reminder` and `appointment_reminder`. A provisional example:
+Sources: [PR #5](https://github.com/kunjcr2/CS160_Project/pull/5),
+[PR #11](https://github.com/kunjcr2/CS160_Project/pull/11),
+[PR #13](https://github.com/kunjcr2/CS160_Project/pull/13),
+[PR #17](https://github.com/kunjcr2/CS160_Project/pull/17),
+[PR #18](https://github.com/kunjcr2/CS160_Project/pull/18),
+[PR #21](https://github.com/kunjcr2/CS160_Project/pull/21).
 
-```json
-{
-  "id": "notification-uuid",
-  "kind": "medication_reminder",
-  "payload": {
-    "id": "medication-reminder-uuid",
-    "medication_name": "Lisinopril",
-    "dosage": "10 mg",
-    "due_at": "2026-10-13T15:00:00Z",
-    "status": "sent",
-    "message": "Time to take your Lisinopril, 10 mg."
-  }
-}
-```
+All routes below use /api/v1.
 
-A flat envelope must supply `reminder_id` explicitly. The notification's own ID
-is never used as a medication reminder ID. Unknown notification kinds are ignored;
-invalid known reminders produce an error rather than sending to a guessed ID.
+| Route | Frontend behavior |
+| --- | --- |
+| POST /auth/login | Email/password; access token response |
+| POST /auth/pair | Eight-digit code; access token response |
+| POST /auth/refresh | Restore/refresh with HttpOnly cookie |
+| POST /auth/logout | Accepts 204, clears signed-in screen |
+| GET /users/me | Profile role, name and timezone |
+| POST /ai/transcribe | Multipart field audio; response {text} |
+| POST /ai/process | JSON {text, language: "en"}; response {reply, proposal} |
+| POST /ai/tts | JSON {text}; binary audio/mpeg response |
+| POST /actions/{id}/confirm or /cancel | Response {action, message}; verify action.id and action.status |
+| GET /notifications | Flat notification array; id is reminder ID |
+| POST /appointment-reminders/{id}/acknowledge | Verify returned reminder is acknowledged |
+| POST /medication-reminders/{id}/taken or /missed | No body; verify returned dose status |
 
-Confirmed medication writes: bodyless POST to
-`/api/v1/medication-reminders/{reminderId}/taken` or `/missed`, returning the updated
-reminder. Appointment OK currently uses `{notificationsPath}/{notificationId}/ack`
-from plan.md, then re-fetches to verify `acknowledged`; this contract still needs confirmation.
+Access tokens stay in memory, not localStorage. Requests include credentials.
+A 401 on an authenticated feature request attempts one shared refresh and one
+retry. Within an API instance, concurrent requests (including StrictMode session
+restores) await the same promise. A late 401 reuses an already-refreshed token.
+Across same-origin tabs/API instances, the browser's Web Locks API serializes
+refresh, login/pairing, and logout. Each tab refreshes using the latest HttpOnly
+cookie after the previous operation completes; tokens are not broadcast or
+written to browser storage. See the [Web Locks specification](https://www.w3.org/TR/web-locks/).
 
-### Conversation and Authentication to Confirm
+Live authentication requires a browser with Web Locks over HTTPS or localhost.
+If unavailable, the UI reports the problem without sending an unsafe refresh.
+Use one canonical frontend origin: locks do not coordinate different ports or
+hostnames even when cookies might be shared. Waiting for another tab is limited
+to 30 seconds; each auth network request has a 15-second timeout.
 
-- `POST /api/v1/ai/process`: `{ text, conversation_id? }`; adapter expects a string
-  `reply` (or `response`/`text`), optional `conversation_id`, and optional
-  `pending_action` (or `proposal`) with `{ id, summary, details?, expires_at? }`.
-- `POST /api/v1/actions/{id}/confirm` or `/cancel`: adapter currently requires
-  `{ status: "executed" | "cancelled", message: "..." }` before showing success.
-- HTTP requests include cookies. `createApi` has a `getAccessToken` callback for
-  the future session controller; the app does not yet supply a bearer token.
-  SSE currently requires cookie authentication. Login/pairing and voice capture/TTS
-  remain dependent on the backend contracts and are not claimed as complete.
-- `models/api.js` is the only network layer. Hooks live in `controllers/`;
-  reusable UI lives in `views/components/`, following plan.md.
+Only an authentication rejection expires the session; network/5xx failures
+remain retryable errors. Old responses cannot refresh or overwrite a session
+after a local login/logout. Cross-tab logout does not immediately erase another
+tab's screen; that tab discovers session expiry on its next rejected request or
+reload (backend access-token revocation behavior still applies).
+There is no blind retry of failed or timed-out mutations. Errors with
+detail.code/message preserve the backend message, including medication too_early.
+
+PR #5's semantic proposal (kind, doctor/date_hint or medication/time_hint) has
+no persisted action ID. The UI displays the reply and an explicit unsaved notice,
+not a working Confirm button. It never invents an ID or creates an action using
+guessed slot/medication data. A future pending_action object with id and
+summary_text can use the existing confirmation card. A 200 action response
+with action.status=failed is an error, not a successful booking.
+
+## Voice Behavior
+
+- Record a complete utterance, then send the recording to /ai/transcribe.
+- The transcript is appended to the existing draft without automatically sending.
+  Users review/edit it and explicitly send it to /ai/process.
+- Recordings stop at 60 seconds, with a 10 MiB client size limit. Supported
+  MediaRecorder formats are WebM/Opus, WebM and MP4, selected by browser capability.
+- Microphone permission is requested only on Record. Cancel, logout and unmount
+  stop tracks, discard the recording and abort pending voice work.
+- Each assistant reply has Play/Stop. Read replies aloud is opt-in and off initially.
+  Only one audio response plays at a time; object URLs are released.
+- STT and AI allow 60 seconds; TTS allows 90 seconds. Cancel stops pending playback.
+  The API's 2,000-character limit is respected without silently truncating text.
+- Microphone, network, empty transcription, audio decoding and autoplay failures
+  leave text input/replies available. No client-side action is triggered by speech.
+- Audio is not stored locally or uploaded until recording stops. Cancel before
+  stopping discards it; cancelling an already-sent request cannot undo server receipt.
+
+This is turn-based speech, not streaming or a hands-free confirmation flow.
+English only; multilingual and speech-rate settings are not wired to PR #5.
+
+Known main blockers (verified November 7): the speech endpoint passes
+`content_type` to `OpenAISpeechToText.transcribe`, but the real adapter currently
+accepts only `audio` and `filename`. Real STT needs that backend mismatch fixed.
+The fake TTS adapter returns placeholder bytes rather than a playable MP3, so it
+cannot be used to validate browser audio playback. Frontend tests mock speech.
+
+## Reminder Behavior
+
+While the page is visible, poll every 20 seconds; refresh on focus or manually.
+No SSE/WebSocket is assumed, and this does not notify while the app is closed.
+Only the backend decides when a reminder changes to missed. Responses replace
+matching reminders, so refresh does not create duplicate banners.
+
+Taken/Missed appear only for sent doses and an older_adult profile. Appointment
+reminders use OK. The profile timezone formats UTC timestamps. A mutation response
+without message retains the banner's existing backend message.
+
+PR #21 still needs its medication source registered in PR #13's feed.
+The older-adult medication list/add/daily-dose screens are not implemented.
+Amar's action/notification branches still need integration with Zohreh's shared
+Bearer authentication. Do not mark these as live-tested based on frontend mocks.
 
 ## Verification
 
+November 13 local results: 25 unit tests passed, 27 Chrome offline browser tests
+passed, and the production build passed. The normal dev-server browser run was
+blocked by this environment (Edge launch failure; Chrome localhost network
+access denied). Real backend and microphone acceptance remain pending.
+
 ```powershell
 npm test
+$env:PW_CHANNEL = "chrome"
 npm run test:e2e
 npm run build
 ```
 
-Browser tests start isolated demo/live Vite servers on ports 5180/5181 and intercept
-live API responses. They test UI contracts, not an actual backend or database.
-They use installed Microsoft Edge by default. Set `PW_CHANNEL=chrome` to use Chrome.
-For an environment with restricted temp access, set `PWTEST_CACHE_DIR` to a writable
-directory, e.g. `$env:PWTEST_CACHE_DIR = "$PWD/.npm-cache/playwright-transform"`.
-Screenshots are in ignored `test-results/`. The tests cover 1440px, 390px and 320px
-viewports, larger text, confirmations, medication actions, automatic missed,
-conflicts and retry. No database migrations are added by this frontend change.
+Browser tests start isolated demo/live servers on 5180/5181 and intercept HTTP
+responses. Voice tests simulate MediaRecorder and Audio for deterministic tests;
+they do not verify microphone hardware, recognition quality or real MP3 decoding.
+Manually verify those on the integrated backend before marking voice complete.
+
+If the test environment cannot reach local HTTP servers, use offline browser
+tests: set `PW_OFFLINE_BUILD=1` and run `npm run test:e2e`. The runner builds demo
+and live artifacts, then Playwright serves them from disk using route fixtures.
+Browser locks and cookies are real; API/media responses remain mocked. Offline
+mode exercises production bundles; the normal Vite mode also exercises React's
+development StrictMode. In PowerShell:
+
+```powershell
+$env:PW_CHANNEL = "chrome"
+$env:PW_OFFLINE_BUILD = "1"
+npm run test:e2e
+Remove-Item Env:PW_OFFLINE_BUILD
+```
+
+Tests include permission denial, cancel/discard, transcription failure/retry,
+review-before-send, blocked playback, pairing/logout, profile timezone, polling,
+role restrictions, confirmations, reminder conflicts, and desktop/390px/320px layout.
+Auth regression tests also cover late 401 responses, transient refresh failures,
+cancellation, stale responses after logout/login, and two tabs rotating a shared
+HttpOnly cookie with real browser locks. HTTP responses remain mocked; these
+tests do not establish acceptance against the real auth service/PostgreSQL.
+Screenshots are under ignored test-results/. Test caches use isolated .npm-cache
+directories to avoid Windows file locks. PW_CHANNEL defaults to msedge; Chrome
+can be selected above. PWTEST_CACHE_DIR can override the transform-cache path.

@@ -1,7 +1,22 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures.js";
 
 const demo = "http://127.0.0.1:5180";
 const live = "http://127.0.0.1:5181";
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/v1/auth/refresh", (route) =>
+    route.fulfill({ json: { access_token: "test-token" } }),
+  );
+  await page.route("**/api/v1/users/me", (route) =>
+    route.fulfill({
+      json: {
+        id: "user-1",
+        role: "older_adult",
+        display_name: "Margaret",
+        timezone: "America/Los_Angeles",
+      },
+    }),
+  );
+});
 const medication = (page) =>
   page.getByRole("article", { name: "Medication reminder", exact: true });
 const fixture = {

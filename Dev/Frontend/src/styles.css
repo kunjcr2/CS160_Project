@@ -15,6 +15,7 @@ body {
   min-width: 320px;
 }
 button,
+input,
 textarea {
   font: inherit;
 }
@@ -39,6 +40,7 @@ button:disabled {
   cursor: not-allowed;
 }
 button:focus-visible,
+input:focus-visible,
 textarea:focus-visible,
 summary:focus-visible,
 a:focus-visible {
@@ -499,4 +501,83 @@ footer {
   * {
     scroll-behavior: auto !important;
   }
+}
+
+.header-actions,
+.voice-toolbar,
+.reply-audio,
+.sign-in-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.header-actions {
+  justify-content: flex-end;
+  min-width: 0;
+}
+.header-actions .quiet-label {
+  overflow-wrap: anywhere;
+}
+.voice-toolbar {
+  margin-top: 14px;
+  min-height: 48px;
+}
+.voice-status {
+  font-size: 15px;
+}
+.speech-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+}
+.speech-toggle input {
+  width: 20px;
+  height: 20px;
+  accent-color: #286449;
+}
+.reply-audio {
+  margin-top: 10px;
+  font-size: 15px;
+}
+.reply-audio [role="alert"] {
+  color: #922e26;
+}
+.message .proposal-notice {
+  border-left: 3px solid #b48020;
+  padding: 8px 12px;
+  margin-top: 12px;
+  font-size: 18px;
+  background: #fff5dc;
+}
+.sign-in {
+  max-width: 480px;
+  margin: 48px auto;
+  padding: 24px;
+}
+.sign-in h2 {
+  margin: 24px 0 16px;
+  font-size: 24px;
+}
+.sign-in-tabs {
+  margin-bottom: 24px;
+}
+.sign-in-tabs [aria-pressed="true"] {
+  background: #e3f0e7;
+  border-color: #286449;
+}
+.sign-in label {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.sign-in input {
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #abbdb0;
+  border-radius: 6px;
+  background: white;
+  color: #233730;
 }

@@ -15,8 +15,11 @@ export function useConversation(api) {
   const [failedText, setFailedText] = useState("");
   const locked = useRef(false);
   const conversationId = useRef(null);
-  const append = (role, text) =>
-    setMessages((items) => [...items, { id: crypto.randomUUID(), role, text }]);
+  const append = (role, text, notice = "") =>
+    setMessages((items) => [
+      ...items,
+      { id: crypto.randomUUID(), role, text, notice },
+    ]);
 
   async function send(text, retry = false) {
     const clean = text.trim();
@@ -28,7 +31,7 @@ export function useConversation(api) {
     if (!retry) append("user", clean);
     try {
       const reply = await api.converse(clean, conversationId.current);
-      append("assistant", reply.text);
+      append("assistant", reply.text, reply.notice);
       setProposal(reply.proposal);
       conversationId.current = reply.conversation_id ?? conversationId.current;
     } catch (error) {
