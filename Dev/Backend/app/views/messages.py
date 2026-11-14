@@ -36,6 +36,7 @@ SERVICE_UNAVAILABLE = "Something went wrong on my end, and nothing was changed. 
 
 # Sign-in
 PAIRING_CODE_INVALID = "That code didn't work. Please ask your helper for a new one."
+TOO_MANY_ATTEMPTS = "Too many attempts. Please wait a minute and try again."
 
 # Conversation (SR-08). These replies accompany proposals only; another controller
 # will persist and confirm any action before it can be carried out.
