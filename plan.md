@@ -390,8 +390,11 @@ These aren't in the feature list, but the 7 features won't work without them.
 ### 6.2 Mock provider service (FHIR-shaped)
 Shape the mock data after real FHIR resources so the engineering is credible:
 `Practitioner`, `Slot`, `Appointment`, `MedicationRequest`, `Communication`.
+**`MedicationRequest` and `Communication` are deferred**: not needed for S2-05, and not built yet.
 - Add realistic **latency** and **random failures** (configurable). Our error paths need something to test against.
 - Put it behind an interface (`HealthcareProvider`) in `app/adapters/healthcare/`, with `MockHealthcareProvider` as the only implementation for now.
+- **Built (S2-05):** `interface.py` + `mock.py`. 3 fake doctors; slots Mon–Fri 9:00–17:00 Pacific, 30 min, no lunch slots; each slot has an id (`<doctor>|YYYYMMDDTHHMMZ`, read with `parse_slot_id`); about 1 in 4 slots are already taken by other patients (stable hash, same every run). Settings: `MOCK_PROVIDER_LATENCY_MS`, `MOCK_PROVIDER_FAILURE_RATE` (both off by default, both validated at startup so a bad `.env` fails with a named variable, not a bare crash on first use). `main.py` builds one shared instance; endpoints get it with the `Healthcare` dependency.
+- **Bookings are in-memory only, and this mock is single-process only.** They live in a plain dict inside the `MockHealthcareProvider` instance, not the database, so they're lost on every restart (or `--reload`) and never shared across `--workers`/processes. The **`appointments` table is the source of truth**, not the mock: cancelling or rebooking a ref the mock no longer remembers is treated as a no-op/free slot, never an error, since a restart is expected to desync the two.
 
 ### 6.3 Scheduler / background worker (needed by PB-02 and PB-03)
 Reminders must fire even when nobody is making a request. Recommended simple, robust design:
@@ -475,6 +478,7 @@ Who did what, when: logins, consent grants, every pending-action transition, car
 
 ### 6.12 Seed / demo data
 Seed Margaret's story: her cardiologist and physical therapist, four medications (two twice daily), open slots next week, a pharmacy of record, a caregiver (her son), and a support agent. The demo then has a real narrative. Use only mock/demo health information, never real patient data.
+- **Built (S2-05):** `python -m scripts.seed` creates the providers, Margaret, her son (caregiver, all scopes), and a support agent. Safe to run many times. Medications and the pharmacy are added in S2-06.
 
 ### 6.13 Observability
 Health endpoint (already exists), structured logs with a request id, and **no health data or audio in logs** (log ids, not content).
@@ -599,7 +603,7 @@ Also: list upcoming, cancel, reschedule (each needs confirmation).
 | HumanAssistanceRequest | requestId, userId, reason, status |
 | PendingAction | actionId, userId, actionType, summary, status, expiresAt (persisted Command, §4) |
 | Provider | providerId, name, specialty, location |
-| Slot | slotId, providerId, start, end, available (from the mock provider; not stored as a table) |
+| Slot | slotId, providerId, start, end (from the mock provider; not stored as a table). `available` is not a field: the mock's `find_slots` only ever returns free slots, so there's nothing to flag — deferred until a real provider needs it. |
 | ConsentGrant | grantId, olderAdultId, caregiverId, scopes |
 | Session | sessionId, userId, deviceLabel, expiresAt, revokedAt |
 
@@ -718,7 +722,7 @@ Dev/Backend/app/
 ├── workers/
 │   └── reminder_worker.py   # polls due reminders, publishes ReminderDue
 ├── alembic/                 # migrations; versions/ files are named by date (exists)
-├── scripts/seed.py          # Margaret demo data (stub)
+├── scripts/seed.py          # Margaret demo data: python -m scripts.seed
 ├── tests/                   # conftest.py always uses voice_assistant_test (exists)
 ├── alembic.ini
 ├── pyproject.toml           # pytest + ruff settings
@@ -1099,6 +1103,7 @@ Don't silently change major decisions. Update this file and the backlog.
 | Sprint 2 (proposed) | **PB-05 multilingual becomes a stretch goal**; English only first, designed to grow (§6.8) | Largest item (13 pts), touches every feature, lowest top-3 ranking; limited time | Proposed: needs team agreement (incl. Kunj) |
 | Sprint 2 | **Application finished by end of week 12 (Nov 8)**: all features except PB-05, implemented and debugged; feature freeze Nov 4; week 13 for demo preparation (§17) | Course has three implementation sprints left; leaves a buffer week before demos | Active |
 | Sprint 2 | User-facing backend text in one file, `views/messages.py` (replaces planned `views/i18n/`) | No translations needed now; one place to reword after usability tests and to translate later | Active |
+| Sprint 2 (Oct 15) | **One mock provider:** keep Zohreh's S2-05 `HealthcareProvider` / `MockHealthcareProvider` as the base, plus Amar's slot id and pre-taken slots; Amar's booking code switches to it | Avoids two competing mocks; settings from `.env`, injected with `Depends`, doctor list for the seed, own tests; Amar's ideas make the demo realistic | Agreed (Zohreh + Amar) |
 
 Add rows whenever a major project decision changes.
 
