@@ -56,6 +56,28 @@ export function normalizeReply(payload) {
   return { text, proposal, notice, conversation_id: payload.conversation_id };
 }
 
+export function normalizeAction(action) {
+  if (
+    !action ||
+    typeof action.id !== "string" ||
+    !action.id ||
+    typeof action.summary_text !== "string" ||
+    !action.summary_text.trim() ||
+    action.status !== "proposed" ||
+    !Number.isFinite(Date.parse(action.expires_at))
+  )
+    throw new ApiError(
+      "The confirmation response is incomplete. Please refresh before continuing.",
+    );
+  return { ...action, summary: action.summary_text };
+}
+
+function listResponse(value) {
+  if (!Array.isArray(value))
+    throw new ApiError("The service returned an unexpected list.");
+  return value;
+}
+
 export function createApi({
   notificationsPath = "/api/v1/notifications",
   getAccessToken = () => null,
@@ -227,6 +249,62 @@ export function createApi({
           method: "POST",
           body: { text, language: "en" },
           timeoutMs: 60000,
+        }),
+      );
+    },
+    async getPendingAction(signal) {
+      const result = await request("/api/v1/actions/pending", { signal });
+      if (result?.action === null) return null;
+      return normalizeAction(result?.action);
+    },
+    async proposeAppointment(slotId) {
+      return normalizeAction(
+        await request("/api/v1/actions", {
+          method: "POST",
+          body: {
+            action_type: "book_appointment",
+            payload: { slot_id: slotId },
+          },
+        }),
+      );
+    },
+    async listProviders(signal) {
+      return listResponse(await request("/api/v1/providers", { signal }));
+    },
+    async listSlots(providerId, from, to, signal) {
+      const query = new URLSearchParams({
+        provider_id: providerId,
+        from,
+        to,
+        limit: "20",
+      });
+      return listResponse(await request(`/api/v1/slots?${query}`, { signal }));
+    },
+    async listAppointments(signal) {
+      return listResponse(await request("/api/v1/appointments", { signal }));
+    },
+    async listMedications(userId, signal) {
+      return listResponse(
+        await request(
+          `/api/v1/older-adults/${encodeURIComponent(userId)}/medications`,
+          { signal },
+        ),
+      );
+    },
+    async listMedicationReminders(userId, date, signal) {
+      const query = new URLSearchParams({ date });
+      const rows = listResponse(
+        await request(
+          `/api/v1/older-adults/${encodeURIComponent(userId)}/medication-reminders?${query}`,
+          { signal },
+        ),
+      );
+      // The daily-dose endpoint intentionally has no message field. Display the
+      // prescribed name/dosage as a neutral label, not an instruction to take it.
+      return rows.map((row) =>
+        normalizeReminder({
+          ...row,
+          message: `${row.medication_name}, ${row.dosage}`,
         }),
       );
     },

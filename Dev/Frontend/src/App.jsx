@@ -25,6 +25,7 @@ import { useNotifications } from "./controllers/useNotifications.js";
 import ConfirmationCard from "./views/components/ConfirmationCard.jsx";
 import ReminderBanner from "./views/components/ReminderBanner.jsx";
 import SignIn from "./views/components/SignIn.jsx";
+import CarePanel from "./views/components/CarePanel.jsx";
 import { useVoice, useSpeechPlayback } from "./controllers/useVoice.js";
 
 const mode =
@@ -96,6 +97,8 @@ function Companion({ api, user, onSignOut }) {
   const conversation = useConversation(api);
   const notifications = useNotifications(api);
   const [draft, setDraft] = useState("");
+  const [careTab, setCareTab] = useState("");
+  const carePanel = useRef(null);
   const [largeText, setLargeText] = useState(false);
   const [demoNotice, setDemoNotice] = useState("");
   const end = useRef(null);
@@ -117,7 +120,11 @@ function Companion({ api, user, onSignOut }) {
     (item) => item.status === "sent",
   ).length;
   const occupied = Boolean(
-    conversation.busy || conversation.proposal || voiceBusy || signingOut,
+    conversation.busy ||
+      conversation.proposal ||
+      !conversation.pendingReady ||
+      voiceBusy ||
+      signingOut,
   );
 
   useEffect(() => {
@@ -323,6 +330,25 @@ function Companion({ api, user, onSignOut }) {
               onResolve={conversation.resolve}
             />
           )}
+          {!conversation.pendingReady && (
+            <div
+              className={conversation.pendingError ? "error" : "quiet-label"}
+              role={conversation.pendingError ? "alert" : "status"}
+            >
+              <p>
+                {conversation.pendingError ||
+                  "Checking for a pending confirmation..."}
+              </p>
+              {conversation.pendingError && (
+                <button
+                  className="secondary"
+                  onClick={conversation.restorePending}
+                >
+                  Retry pending confirmation
+                </button>
+              )}
+            </div>
+          )}
           {conversation.error && (
             <div className="error" role="alert">
               <CircleAlert size={22} aria-hidden="true" />
@@ -349,6 +375,11 @@ function Companion({ api, user, onSignOut }) {
                 className="secondary"
                 disabled={occupied}
                 onClick={() => {
+                  if (api.mode === "live") {
+                    setCareTab("appointments");
+                    carePanel.current?.focus();
+                    return;
+                  }
                   setDraft("I'd like to book a doctor appointment.");
                   input.current?.focus();
                 }}
@@ -558,6 +589,17 @@ function Companion({ api, user, onSignOut }) {
             Times shown in {timeZone.replaceAll("_", " ")}.
           </p>
         </aside>
+        <CarePanel
+          api={api}
+          tab={careTab}
+          setTab={setCareTab}
+          panelRef={carePanel}
+          user={user}
+          timeZone={timeZone}
+          disabled={occupied}
+          conversation={conversation}
+          onReminderChange={notifications.refresh}
+        />
       </main>
       {api.mode === "demo" && (
         <details className="demo-tools">

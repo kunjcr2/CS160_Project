@@ -44,6 +44,60 @@ export function createDemoApi() {
   }
   return {
     mode: "demo",
+    async getPendingAction() {
+      return null;
+    },
+    async listProviders() {
+      return [
+        {
+          id: "demo-doctor",
+          name: "Dr. Elena Chen",
+          specialty: "Cardiology",
+          location: "SJSU Health Clinic",
+        },
+      ];
+    },
+    async listSlots(providerId, from) {
+      return [
+        {
+          slot_id: `demo-slot:${from}`,
+          provider: { name: "Dr. Elena Chen" },
+          starts_at: tomorrow.toISOString(),
+          ends_at: new Date(tomorrow.getTime() + 1800000).toISOString(),
+          label: "Sample appointment tomorrow at 10:30 AM",
+        },
+      ];
+    },
+    async proposeAppointment() {
+      await settle();
+      const id = crypto.randomUUID();
+      actions.set(id, "pending");
+      return {
+        id,
+        summary: "Book a sample appointment with Dr. Elena Chen?",
+        status: "proposed",
+        expires_at: new Date(Date.now() + 300000).toISOString(),
+      };
+    },
+    async listAppointments() {
+      return [];
+    },
+    async listMedications() {
+      return [
+        {
+          id: "demo-medication",
+          name: "Lisinopril",
+          dosage: "10 mg",
+          instructions: null,
+          schedules: [
+            { time_of_day: "08:00:00", days_of_week: [0, 1, 2, 3, 4, 5, 6] },
+          ],
+        },
+      ];
+    },
+    async listMedicationReminders() {
+      return copy(rows.filter((row) => row.kind === "medication_reminder"));
+    },
     async converse(text) {
       await settle();
       if (/\b(appointment|doctor|book|visit)\b/i.test(text)) {

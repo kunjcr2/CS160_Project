@@ -2,26 +2,30 @@
 
 React/Vite conversation, confirmations, reminders, and the first Sprint 3 voice UI.
 
-## Status (November 13, 2026)
+## Status (November 14, 2026)
 
 | Area | Implemented locally | Remaining acceptance work |
 | --- | --- | --- |
-| S2-15 | Conversation UI; action response adapter for PR #11 | AI intent-to-persisted-action integration and real backend testing |
-| S2-16 | Notification polling; appointment OK; medication Taken/Missed; profile timezone and role checks | Shared Bearer authentication in Amar's controllers; medication source registration; real worker tests |
+| S2-15 | Conversation UI; provider/slot search; explicit proposal and confirmation; pending-action recovery | AI intent-to-persisted-action integration and PostgreSQL acceptance |
+| S2-16 | Notification polling; appointment OK; medication Taken/Missed; medication schedules and daily doses; profile timezone and role checks | Medication feed/worker patch review and real worker tests |
 | S2-17 | Exact direct dependency versions, lockfile, setup README | Review and merge |
 | Sprint 3 voice | Microphone capture, transcription review, reply playback, opt-in automatic reading, cancellation and text fallback | Test with real microphone, actual STT/TTS, and integrated backend |
 | Auth integration | Pairing/email sign-in; single-flight refresh; cross-tab cookie lock; stale-session protection | Real auth API acceptance after PR #17/#18 merge |
 | Sprint 3 remaining screens | Not implemented | Confirm Help, support queue, care messages and refill API contracts and team assignments |
 
-This implements the frontend against the reviewed PR code. It does not merge
-teammates' branches, migrate databases, or claim live end-to-end acceptance.
+This implements the frontend against the reviewed PR code. An isolated local
+integration checkout combines the backend PRs; no remote PRs were merged and
+no existing databases were migrated. This is not a claim of live end-to-end acceptance.
 Remote main now includes PR #5 (AI conversation and speech) and PR #16 (the real
 users table and first migration), in addition to the health endpoint.
 Auth, actions, and notifications are still in open PRs, so main
 alone cannot run this frontend's full live workflow. The local frontend branch
 has been merged with that main locally; the Python cache/virtualenv ignore rules
 from both branches were preserved. This branch includes the auth, reminder, and
-voice frontend updates for PR #20; live integration is still pending.
+voice frontend updates for PR #20. A separate local `integration/frontend-pr-apis`
+branch includes PR #15, whose latest head already incorporates #11–#14 and
+#17–#19/#21. Shared Bearer authentication is present there. See
+[the integration notes](PR_API_INTEGRATION.md) for pinned revisions and setup.
 Sprint 3 is not complete.
 
 ## Run Locally
@@ -77,6 +81,7 @@ A passing /api/health response does not verify feature readiness.
 
 Sources: [PR #5](https://github.com/kunjcr2/CS160_Project/pull/5),
 [PR #11](https://github.com/kunjcr2/CS160_Project/pull/11),
+[PR #12](https://github.com/kunjcr2/CS160_Project/pull/12),
 [PR #13](https://github.com/kunjcr2/CS160_Project/pull/13),
 [PR #17](https://github.com/kunjcr2/CS160_Project/pull/17),
 [PR #18](https://github.com/kunjcr2/CS160_Project/pull/18),
@@ -95,6 +100,12 @@ All routes below use /api/v1.
 | POST /ai/process | JSON {text, language: "en"}; response {reply, proposal} |
 | POST /ai/tts | JSON {text}; binary audio/mpeg response |
 | POST /actions/{id}/confirm or /cancel | Response {action, message}; verify action.id and action.status |
+| GET /actions/pending | Restore a saved confirmation before allowing a new request |
+| GET /providers; GET /slots?provider_id&from&to&limit | Search available times in a date range of at most 31 days |
+| POST /actions | Propose book_appointment with the exact returned slot_id; never auto-confirm |
+| GET /appointments | List upcoming appointments; refresh after confirmation |
+| GET /older-adults/{id}/medications | Show prescribed medications and local schedules |
+| GET /older-adults/{id}/medication-reminders?date=YYYY-MM-DD | Show the selected date's doses; default date uses the profile timezone |
 | GET /notifications | Flat notification array; id is reminder ID |
 | POST /appointment-reminders/{id}/acknowledge | Verify returned reminder is acknowledged |
 | POST /medication-reminders/{id}/taken or /missed | No body; verify returned dose status |
@@ -150,9 +161,10 @@ with action.status=failed is an error, not a successful booking.
 This is turn-based speech, not streaming or a hands-free confirmation flow.
 English only; multilingual and speech-rate settings are not wired to PR #5.
 
-Known main blockers (verified November 7): the speech endpoint passes
+Speech integration issue: the speech endpoint passes
 `content_type` to `OpenAISpeechToText.transcribe`, but the real adapter currently
-accepts only `audio` and `filename`. Real STT needs that backend mismatch fixed.
+accepts only `audio` and `filename`. The isolated integration branch fixes that
+signature; the frontend branch does not include the backend patch.
 The fake TTS adapter returns placeholder bytes rather than a playable MP3, so it
 cannot be used to validate browser audio playback. Frontend tests mock speech.
 
@@ -167,14 +179,28 @@ Taken/Missed appear only for sent doses and an older_adult profile. Appointment
 reminders use OK. The profile timezone formats UTC timestamps. A mutation response
 without message retains the banner's existing backend message.
 
-PR #21 still needs its medication source registered in PR #13's feed.
-The older-adult medication list/add/daily-dose screens are not implemented.
-Amar's action/notification branches still need integration with Zohreh's shared
-Bearer authentication. Do not mark these as live-tested based on frontend mocks.
+The isolated integration branch registers PR #21's medication source in PR #13's
+feed and worker. These backend patches still need teammate review. The older-adult
+medication list and daily-dose screens use PR #21 directly, including status updates
+every 20 seconds while open. A failed refresh disables stale dose buttons until a
+successful refresh. Adding medications, caregiver patient selection, Help, messaging,
+support queues and refill requests are not implemented. Shared Bearer authentication
+is already in the combined backend PR head. Do not mark this as live-tested based
+on frontend mocks.
+
+## Appointment Selection and Recovery
+
+Open **Find appointments**, choose a doctor/date range, and select **Review this time**.
+This calls POST /actions; only the confirmation card's **Confirm** calls /confirm.
+The exact server slot ID is retained. A slot conflict or failed action is shown as
+an error, and the appointment list is refreshed after resolution. No AI intent is
+converted into an invented slot. Pending confirmations are restored on sign-in or
+page reload. A failed pending lookup blocks new requests until retry succeeds;
+a lost proposal response triggers recovery instead of blindly replacing the action.
 
 ## Verification
 
-November 13 local results: 25 unit tests passed, 27 Chrome offline browser tests
+November 14 local results: 29 unit tests passed, 33 Chrome offline browser tests
 passed, and the production build passed. The normal dev-server browser run was
 blocked by this environment (Edge launch failure; Chrome localhost network
 access denied). Real backend and microphone acceptance remain pending.
