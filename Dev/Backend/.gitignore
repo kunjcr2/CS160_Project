@@ -1,5 +1,6 @@
 # Python
 .venv/
+.pip-cache/
 .venv-win/
 __pycache__/
 *.py[cod]
