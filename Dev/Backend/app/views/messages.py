@@ -24,6 +24,9 @@ REMINDERS = {
 MEDICATION_TOO_EARLY = "It's too early for this dose. I'll remind you when it's time."
 MEDICATION_NOT_CHANGEABLE = "This reminder can't be changed anymore."
 
+# Safety guardrails (§6.7)
+EMERGENCY_DETECTED = "This sounds like an emergency. Please call 911 now."
+
 # Confirmation
 CONFIRM_UNCLEAR = "I didn't catch a yes or a no. Should I go ahead?"
 ACTION_CANCELLED = "Okay, I won't do that."
