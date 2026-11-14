@@ -15,8 +15,9 @@ React/Vite conversation, confirmations, reminders, and the first Sprint 3 voice 
 
 This implements the frontend against the reviewed PR code. It does not merge
 teammates' branches, migrate databases, or claim live end-to-end acceptance.
-Remote main now includes PR #5 (AI conversation and speech), in addition to the
-health endpoint. Auth, actions, and notifications are still in open PRs, so main
+Remote main now includes PR #5 (AI conversation and speech) and PR #16 (the real
+users table and first migration), in addition to the health endpoint.
+Auth, actions, and notifications are still in open PRs, so main
 alone cannot run this frontend's full live workflow. The local frontend branch
 has been merged with that main locally; the Python cache/virtualenv ignore rules
 from both branches were preserved. This branch includes the auth, reminder, and
