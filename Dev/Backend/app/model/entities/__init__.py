@@ -2,6 +2,7 @@
 
 from .appointment import Appointment, AppointmentReminder
 from .base import Base
+from .consent_grant import ConsentGrant
 from .pairing_code import PairingCode
 from .pending_action import PendingAction
 from .provider import Provider
@@ -17,4 +18,5 @@ __all__ = [
     "Appointment",
     "AppointmentReminder",
     "PendingAction",
+    "ConsentGrant",
 ]

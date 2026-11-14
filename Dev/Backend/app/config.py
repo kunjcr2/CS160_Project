@@ -53,5 +53,8 @@ class Settings(BaseSettings):
             )
         return value
 
+    # How long a pairing code works after it's created.
+    pairing_code_minutes: int = 15
+
 
 settings = Settings()
