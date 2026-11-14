@@ -341,7 +341,7 @@ Known gaps (from PR #18 review):
 - Revoking an older adult's last `profile:manage` grant leaves nobody able to mint a new pairing code for them, until `POST /consents` (granting a *new* caregiver) exists. A lost device would leave that older adult stuck in the meantime.
 - `profile:manage` lets a caregiver pair their own device as the older adult, which is effectively full impersonation of that older adult. This goes around the caregiver/older-adult scope split, but is intended for now.
 - `medications:manage` does not imply `medications:read`. This is fail-closed (a manage-only grant can write but not list), so keep it in mind once the medication routes land.
-- `POST /auth/pair` has no rate limiting yet. It's unauthenticated with a 10^8 code space, so brute-forcing active codes is a real risk; adding a per-IP and global cap is a follow-up (same limiter proposed for login).
+- **Rate limiting: done.** `POST /auth/login`, `POST /auth/register`, and `POST /auth/pair` (the last was unauthenticated with a 10^8 code space, so brute-forcing active codes was a real risk) now share a per-IP limit (`app/model/rate_limit.py`, default 5 attempts per 60 seconds, configurable in `app/config.py`), returning `429` with a `Retry-After` header once exceeded. **Limits:** in-memory only, so it resets on every restart/deploy and is tracked separately per server process (no shared store like Redis, so running more than one worker/process defeats it); it keys on `request.client.host`, so behind a proxy or NAT all callers sharing one IP share one limit, and a spoofed/missing client IP is tracked as `"unknown"` for everyone.
 
 ### 5.3 Confirmation before action (the most important backend design)
 

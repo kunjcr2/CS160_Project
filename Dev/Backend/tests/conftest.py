@@ -31,3 +31,17 @@ def db():
     # Clean up. CASCADE also empties every table that points to these two.
     with engine.begin() as connection:
         connection.execute(text("TRUNCATE users, providers CASCADE"))
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limits():
+    """Clean rate-limit store per test: TestClient always looks like the same IP,
+
+    so without this, unrelated tests calling /auth/* would pile onto one shared
+    count and start seeing 429s.
+    """
+    # Imported here, after DATABASE_URL is set, same as the `db` fixture above.
+    from app.model.rate_limit import reset_rate_limit_store
+
+    reset_rate_limit_store()
+    yield

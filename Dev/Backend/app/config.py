@@ -71,5 +71,9 @@ class Settings(BaseSettings):
     # ...and mark it "missed" after this many minutes (counted from when it was first shown).
     medication_missed_minutes: int = 60
 
+    # In-memory per-IP rate limit on login/register/pair, to slow down guessing attacks.
+    rate_limit_max_attempts: int = Field(default=5, ge=1)
+    rate_limit_window_seconds: float = Field(default=60.0, gt=0)
+
 
 settings = Settings()
