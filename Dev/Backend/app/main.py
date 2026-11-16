@@ -3,6 +3,8 @@
 Run from Dev/Backend:  uvicorn app.main:app --reload --port 5000
 """
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -16,11 +18,21 @@ from app.controllers import (
     consents,
     health,
     medications,
+    notifications,
     older_adults,
     users,
 )
 from app.controllers.conversation.endpoints import router as conversation_router
 from app.controllers.speech import router as speech_router
+from app.workers import reminders
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    stop_worker = reminders.start_in_background() if settings.run_reminder_worker else None
+    yield
+    if stop_worker:
+        stop_worker.set()
 
 
 def build_healthcare_provider() -> HealthcareProvider:
@@ -36,7 +48,7 @@ def build_healthcare_provider() -> HealthcareProvider:
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Voice Assistant for Older Adults", version="0.1.0")
+    app = FastAPI(title="Voice Assistant for Older Adults", version="0.1.0", lifespan=lifespan)
     # ONE shared doctor's office for all requests, so bookings are remembered.
     app.state.healthcare = build_healthcare_provider()
 
@@ -58,6 +70,7 @@ def create_app() -> FastAPI:
     app.include_router(medications.router, prefix="/api/v1")
     app.include_router(actions.router, prefix="/api/v1")
     app.include_router(appointments.router, prefix="/api/v1")
+    app.include_router(notifications.router, prefix="/api/v1")
     app.include_router(conversation_router, prefix="/api/v1")
     app.include_router(speech_router, prefix="/api/v1")
 

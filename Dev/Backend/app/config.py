@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     # Confirmation (plan §5.3): how long a proposed action waits for a yes.
     pending_action_ttl_minutes: int = 5
 
+    # Reminder worker (plan §6.3). RUN_REMINDER_WORKER=true runs it inside the API process
+    # (one terminal); otherwise run `python -m app.workers.reminders` separately.
+    reminder_poll_seconds: float = 30
+    run_reminder_worker: bool = False
+
     # How long a signed-in device stays signed in without logging in again.
     refresh_token_days: int = 90
 
