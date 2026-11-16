@@ -17,6 +17,7 @@ from app.adapters.healthcare.interface import (
     SlotUnavailableError,
     parse_slot_id,
 )
+from app.adapters.messaging.interface import CareMessagingProvider
 from app.model.entities import Appointment, Provider, User
 from app.model.events import AppointmentBooked, events
 from app.model.repositories import appointments as repo
@@ -47,9 +48,14 @@ class BookAppointment(ActionCommand):
     reversible = False  # undo is cancel (Sprint 3), a separate confirmed action
 
     def __init__(
-        self, user: User, payload: dict, *, healthcare: HealthcareProvider | None = None
+        self,
+        user: User,
+        payload: dict,
+        *,
+        healthcare: HealthcareProvider | None = None,
+        messaging: CareMessagingProvider | None = None,
     ) -> None:
-        super().__init__(user, payload, healthcare=healthcare)
+        super().__init__(user, payload, healthcare=healthcare, messaging=messaging)
         self.slot_id = str(payload.get("slot_id", ""))
         try:
             self.practitioner_ref, self.start = parse_slot_id(self.slot_id)

@@ -10,6 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.adapters.healthcare.interface import HealthcareProvider
 from app.adapters.healthcare.mock import MockHealthcareProvider
+from app.adapters.messaging.interface import CareMessagingProvider
+from app.adapters.messaging.mock import MockCareMessaging
 from app.config import settings
 from app.controllers import (
     actions,
@@ -18,6 +20,7 @@ from app.controllers import (
     consents,
     health,
     medications,
+    messages,
     notifications,
     older_adults,
     users,
@@ -48,11 +51,20 @@ def build_healthcare_provider() -> HealthcareProvider:
     )
 
 
+def build_messaging_provider() -> CareMessagingProvider:
+    """Factory: choose the care-team messaging system (plan §4).
+
+    Only the mock exists today, like build_healthcare_provider().
+    """
+    return MockCareMessaging()
+
+
 def create_app() -> FastAPI:
     subscribers.register_all()  # e.g. booking an appointment schedules its reminders
     app = FastAPI(title="Voice Assistant for Older Adults", version="0.1.0", lifespan=lifespan)
     # ONE shared doctor's office for all requests, so bookings are remembered.
     app.state.healthcare = build_healthcare_provider()
+    app.state.messaging = build_messaging_provider()
 
     app.add_middleware(
         CORSMiddleware,
@@ -70,6 +82,7 @@ def create_app() -> FastAPI:
     app.include_router(older_adults.router, prefix="/api/v1")
     app.include_router(consents.router, prefix="/api/v1")
     app.include_router(medications.router, prefix="/api/v1")
+    app.include_router(messages.router, prefix="/api/v1")
     app.include_router(actions.router, prefix="/api/v1")
     app.include_router(appointments.router, prefix="/api/v1")
     app.include_router(notifications.router, prefix="/api/v1")

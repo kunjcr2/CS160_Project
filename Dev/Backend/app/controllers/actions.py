@@ -10,8 +10,9 @@ from datetime import timedelta
 from fastapi import APIRouter, HTTPException, status
 
 from app.adapters.healthcare.interface import HealthcareProvider
+from app.adapters.messaging.interface import CareMessagingProvider
 from app.config import settings
-from app.controllers.dependencies import CurrentUser, Db, Healthcare
+from app.controllers.dependencies import CurrentUser, Db, Healthcare, Messaging
 from app.model.commands import ActionNotPossible, UnknownActionType
 from app.model.services.action_service import ActionNotFound, ActionNotPending, ActionService
 from app.views import messages
@@ -20,9 +21,16 @@ from app.views.schemas.actions import ActionOut, ActionOutcomeOut, PendingAction
 router = APIRouter(prefix="/actions", tags=["actions"])
 
 
-def _service(session, office: HealthcareProvider | None = None) -> ActionService:
+def _service(
+    session,
+    office: HealthcareProvider | None = None,
+    messaging: CareMessagingProvider | None = None,
+) -> ActionService:
     return ActionService(
-        session, healthcare=office, ttl=timedelta(minutes=settings.pending_action_ttl_minutes)
+        session,
+        healthcare=office,
+        messaging=messaging,
+        ttl=timedelta(minutes=settings.pending_action_ttl_minutes),
     )
 
 
@@ -34,7 +42,7 @@ def _not_found() -> HTTPException:
 
 @router.post("", response_model=ActionOut, status_code=status.HTTP_201_CREATED)
 def propose_action(
-    body: ProposeActionIn, user: CurrentUser, session: Db, office: Healthcare
+    body: ProposeActionIn, user: CurrentUser, session: Db, office: Healthcare, messaging: Messaging
 ) -> ActionOut:
     """Create a proposal to read back to the user. This never executes anything.
 
@@ -42,7 +50,7 @@ def propose_action(
     and manual tests do the same without the AI. A new proposal replaces the old one.
     """
     try:
-        action = _service(session, office).propose(user, body.action_type, body.payload)
+        action = _service(session, office, messaging).propose(user, body.action_type, body.payload)
     except UnknownActionType:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -64,14 +72,16 @@ def get_pending_action(user: CurrentUser, session: Db) -> PendingActionOut:
 
 
 @router.post("/{action_id}/confirm", response_model=ActionOutcomeOut)
-def confirm_action(action_id: uuid.UUID, user: CurrentUser, session: Db, office: Healthcare):
+def confirm_action(
+    action_id: uuid.UUID, user: CurrentUser, session: Db, office: Healthcare, messaging: Messaging
+):
     """The user said yes. Safe to call twice: it never executes twice.
 
     200 with status `executed` or `failed` (the message explains the failure) ·
     404 not found or not yours · 409 cancelled, replaced, or expired.
     """
     try:
-        outcome = _service(session, office).confirm(action_id, user)
+        outcome = _service(session, office, messaging).confirm(action_id, user)
     except ActionNotFound:
         raise _not_found() from None
     except ActionNotPending as error:

@@ -6,6 +6,7 @@ from typing import ClassVar
 from sqlalchemy.orm import Session
 
 from app.adapters.healthcare.interface import HealthcareProvider
+from app.adapters.messaging.interface import CareMessagingProvider
 from app.model.entities import User
 
 
@@ -31,11 +32,17 @@ class ActionCommand(ABC):
     reversible: ClassVar[bool] = False  # explicit capability (plan §4, LSP)
 
     def __init__(
-        self, user: User, payload: dict, *, healthcare: HealthcareProvider | None = None
+        self,
+        user: User,
+        payload: dict,
+        *,
+        healthcare: HealthcareProvider | None = None,
+        messaging: CareMessagingProvider | None = None,
     ) -> None:
         self.user = user
         self.payload = payload
         self.healthcare = healthcare
+        self.messaging = messaging
 
     @abstractmethod
     def summary(self, session: Session) -> str:

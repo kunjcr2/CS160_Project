@@ -5,6 +5,7 @@ Open-Closed): ActionService never changes.
 """
 
 from app.adapters.healthcare.interface import HealthcareProvider
+from app.adapters.messaging.interface import CareMessagingProvider
 from app.model.entities import User
 
 from .base import ActionCommand
@@ -27,12 +28,13 @@ def build(
     payload: dict,
     *,
     healthcare: HealthcareProvider | None = None,
+    messaging: CareMessagingProvider | None = None,
 ) -> ActionCommand:
     try:
         command_class = _commands[action_type]
     except KeyError:
         raise UnknownActionType(action_type) from None
-    return command_class(user, payload, healthcare=healthcare)
+    return command_class(user, payload, healthcare=healthcare, messaging=messaging)
 
 
 def registered_types() -> list[str]:

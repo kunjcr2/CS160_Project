@@ -14,6 +14,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.adapters.healthcare.interface import HealthcareProvider
+from app.adapters.messaging.interface import CareMessagingProvider
 from app.model import commands
 from app.model.commands import ActionNotPossible
 from app.model.entities import PendingAction, User
@@ -55,11 +56,13 @@ class ActionService:
         session: Session,
         *,
         healthcare: HealthcareProvider | None = None,
+        messaging: CareMessagingProvider | None = None,
         clock: Callable[[], datetime] = _utcnow,
         ttl: timedelta = DEFAULT_TTL,
     ) -> None:
         self.session = session
         self.healthcare = healthcare  # handed to commands that talk to the doctor's office
+        self.messaging = messaging  # handed to commands that message the care team
         self.clock = clock
         self.ttl = ttl
 
@@ -68,7 +71,9 @@ class ActionService:
 
         Raises UnknownActionType or ActionNotPossible (e.g. the slot is already taken).
         """
-        command = commands.build(action_type, user, payload, healthcare=self.healthcare)
+        command = commands.build(
+            action_type, user, payload, healthcare=self.healthcare, messaging=self.messaging
+        )
         command.revalidate(self.session)
         summary = command.summary(self.session)
 
@@ -112,7 +117,11 @@ class ActionService:
             return ActionOutcome(action, messages.ACTION_EXPIRED)
 
         command = commands.build(
-            action.action_type, user, action.payload, healthcare=self.healthcare
+            action.action_type,
+            user,
+            action.payload,
+            healthcare=self.healthcare,
+            messaging=self.messaging,
         )
         action.status = "confirmed"
         try:
