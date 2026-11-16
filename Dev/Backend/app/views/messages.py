@@ -11,7 +11,10 @@ BOOKING_CONFIRM = "{doctor}, {specialty}, {date} at {time}, at {location}. Shoul
 BOOKING_DONE = "Done. You're booked with {doctor} on {date} at {time}."
 BOOKING_NO_AVAILABILITY = "{doctor} has no open times then. Should I check the next week?"
 BOOKING_SLOT_TAKEN = "Sorry, that time was just taken. The next open times are: {options}."
+BOOKING_SLOT_TAKEN_NO_OPTIONS = "Sorry, that time was just taken. Let's look for another time."
+BOOKING_SLOT_UNKNOWN = "I couldn't find that time. Let's look for another one."
 BOOKING_FAILED = "I couldn't book that, and nothing changed. You can call the office at {phone}."
+BOOKING_FAILED_NO_PHONE = "I couldn't book that, and nothing changed. Please try again later."
 
 # Appointment reminders (PB-02), keyed by AppointmentReminder.kind
 REMINDERS = {
@@ -28,6 +31,8 @@ MEDICATION_NOT_CHANGEABLE = "This reminder can't be changed anymore."
 CONFIRM_UNCLEAR = "I didn't catch a yes or a no. Should I go ahead?"
 ACTION_CANCELLED = "Okay, I won't do that."
 ACTION_EXPIRED = "That request timed out, so I didn't do anything. We can start again."
+ACTION_ALREADY_DONE = "That's already done."
+ACTION_NOT_PENDING = "That request is no longer waiting for an answer, so I didn't do anything."
 
 # Errors and fallback
 NOT_UNDERSTOOD = "Sorry, I didn't understand. Could you say that another way?"
