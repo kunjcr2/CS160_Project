@@ -19,7 +19,14 @@ from sqlalchemy.orm import Session as DbSession
 
 from app.adapters.healthcare.mock import PRACTITIONERS
 from app.db import SessionLocal, engine
-from app.model.entities import ConsentGrant, Medication, MedicationReminder, Provider, User
+from app.model.entities import (
+    ConsentGrant,
+    Medication,
+    MedicationReminder,
+    Message,
+    Provider,
+    User,
+)
 from app.model.entities.consent_grant import SCOPES
 from app.model.entities.medication import EVERY_DAY
 from app.model.security import hash_password
@@ -65,6 +72,19 @@ MARGARET_MEDICATIONS = [
         "instructions": "Take in the evening",
         "refills_remaining": 0,
         "times": ["20:00"],
+    },
+]
+
+# Margaret's demo care-team messages (PB-07, send only). Matched to her story: a
+# primary-care question and a cardiology update, both already "sent" for the demo.
+MARGARET_MESSAGES = [
+    {
+        "doctor_ref": "mock-prac-primary-care-1",  # Dr. Grace Kim
+        "body": "My cough is better since I started the new medicine.",
+    },
+    {
+        "doctor_ref": "mock-prac-cardiology-1",  # Dr. Elena Ruiz
+        "body": "My blood pressure readings have been steady this week.",
     },
 ]
 
@@ -186,6 +206,32 @@ def _count_doses(db: DbSession, margaret: User) -> int:
     return db.scalar(select(func.count()).where(MedicationReminder.user_id == margaret.id))
 
 
+def seed_care_messages(db: DbSession, margaret: User) -> int:
+    """Add Margaret's missing demo care-team messages. Returns messages added.
+
+    Matched by body text against her existing messages, the same way medications
+    are matched by name: each demo message is only ever added once.
+    """
+    have = set(db.scalars(select(Message.body).where(Message.older_adult_id == margaret.id)))
+    added = 0
+    for demo in MARGARET_MESSAGES:
+        if demo["body"] in have:
+            continue
+        provider = db.scalar(select(Provider).where(Provider.external_ref == demo["doctor_ref"]))
+        db.add(
+            Message(
+                sender_id=margaret.id,
+                older_adult_id=margaret.id,
+                provider_id=provider.id,
+                body=demo["body"],
+                status="sent",
+            )
+        )
+        added += 1
+    db.commit()
+    return added
+
+
 def seed_all(db: DbSession, now: datetime | None = None) -> dict:
     """Create the whole demo story. Returns the main people (used by tests).
 
@@ -201,11 +247,13 @@ def seed_all(db: DbSession, now: datetime | None = None) -> dict:
     )
     margaret = get_or_create_margaret(db, caregiver)
     medications_added, doses_added = seed_medications(db, margaret, now)
+    messages_added = seed_care_messages(db, margaret)
     return {
         "providers_added": providers_added,
         "providers_updated": providers_updated,
         "medications_added": medications_added,
         "doses_added": doses_added,
+        "messages_added": messages_added,
         "caregiver": caregiver,
         "caregiver_created": caregiver_created,
         "agent": agent,
@@ -225,6 +273,7 @@ def main() -> None:
     print(f"  Margaret (older adult) id: {result['margaret'].id}")
     print(f"  Medications added: {result['medications_added']} (0 = already there)")
     print(f"  Doses added: {result['doses_added']} (next days, missing ones only)")
+    print(f"  Care messages added: {result['messages_added']} (0 = already there)")
     for label, email, created in (
         ("Caregiver", CAREGIVER_EMAIL, result["caregiver_created"]),
         ("Support agent", AGENT_EMAIL, result["agent_created"]),
