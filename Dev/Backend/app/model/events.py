@@ -23,6 +23,18 @@ class ActionExecuted:
     result: dict
 
 
+@dataclass(frozen=True)
+class AppointmentBooked:
+    appointment_id: uuid.UUID
+    user_id: uuid.UUID
+
+
+@dataclass(frozen=True)
+class AppointmentCancelled:
+    appointment_id: uuid.UUID
+    user_id: uuid.UUID
+
+
 class EventPublisher:
     def __init__(self) -> None:
         self._handlers: dict[type, list[Handler]] = defaultdict(list)

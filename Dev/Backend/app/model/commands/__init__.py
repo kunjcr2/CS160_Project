@@ -2,6 +2,8 @@
 command registry.
 """
 
+# Importing a command module registers it.
+from . import book_appointment  # noqa: F401
 from .base import ActionCommand, ActionNotPossible
 from .registry import UnknownActionType, build, register, registered_types
 
