@@ -24,6 +24,7 @@ REMINDERS = {
 }
 
 # Medication reminders (PB-03)
+MEDICATION_REMINDER = "Time to take your {name}, {dosage}."
 MEDICATION_TOO_EARLY = "It's too early for this dose. I'll remind you when it's time."
 MEDICATION_NOT_CHANGEABLE = "This reminder can't be changed anymore."
 
