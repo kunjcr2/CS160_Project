@@ -428,6 +428,7 @@ A web app can't speak if it's closed. Decide early:
 ### 6.7 Safety guardrails
 - No medical, legal, or financial advice; redirect to a professional (FR-13.3).
 - If a message to the care team contains emergency language ("chest pain," "can't breathe"), **don't send it as a message**. Tell the user to call 911 (FR-6.3). Start with a keyword list plus an LLM check, and document the limits.
+- **Keyword check: done.** `app/model/guardrail.py` (`check_emergency`) matches a one-place word list (chest pain, can't breathe, fell, stroke, heart attack, bleeding, suicide) against the raw text, case- and extra-space-insensitive, with word boundaries so "fell" doesn't match inside "fellow". Wired into the `/ai/process` endpoint before the AI is called; on a match, it returns the fixed 911 message (`messages.EMERGENCY_DETECTED`) and skips the language model and any proposal entirely. **Limits:** keyword-only, so it misses emergencies phrased without these exact words and can still over-trigger on incidental matches (e.g. "a stroke of luck"); it only covers text sent to `/ai/process`, not messages sent to the care team through other paths. **Still to do (Kunj): the LLM-based check**, as a second layer for phrasing the keyword list misses.
 
 ### 6.8 Multilingual support: deferred now, designed to grow later (PB-05)
 
