@@ -16,7 +16,7 @@ from app.views import messages
         "I fell in the bathroom",
         "I think it's a stroke",
         "I'm having a heart attack",
-        "there is bleeding from my arm",
+        "there is heavy bleeding from my arm",
         "I'm thinking about suicide",
     ],
 )
@@ -48,7 +48,7 @@ def test_matches_cant_breathe_spelling_variants(text: str) -> None:
     [
         "I HAVE CHEST PAIN",
         "I Can't Breathe",
-        "STROKE",
+        "HAVING A STROKE",
     ],
 )
 def test_matches_are_case_insensitive(text: str) -> None:
@@ -78,6 +78,52 @@ def test_does_not_false_match_inside_other_words(text: str) -> None:
 
 def test_matches_a_fall_mentioned_about_someone_else() -> None:
     assert check_emergency("Mom fell down the stairs") == messages.EMERGENCY_DETECTED
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "I have chest pains",
+        "chest pains",
+        "I can't breath",
+        "I cant breath",
+        "I am having trouble breathing",
+        "it's hard to breathe",
+    ],
+)
+def test_matches_breathing_plurals_and_misspellings(text: str) -> None:
+    assert check_emergency(text) == messages.EMERGENCY_DETECTED
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "I fell down",
+        "I had a fall",
+        "I think I'm having a stroke",
+        "I think it's a stroke",
+        "it won't stop bleeding",
+        "it's bleeding a lot",
+        "I'm bleeding badly",
+    ],
+)
+def test_matches_narrowed_fall_stroke_and_bleeding_phrases(text: str) -> None:
+    assert check_emergency(text) == messages.EMERGENCY_DETECTED
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "I fell asleep",
+        "I fell asleep watching TV",
+        "Book a follow-up with my stroke doctor",
+        "my stroke doctor",
+        "My gums are bleeding a little when I brush",
+        "my gums are bleeding a little",
+    ],
+)
+def test_does_not_over_trigger_on_narrowed_phrases(text: str) -> None:
+    assert check_emergency(text) is None
 
 
 class ExplodingLanguageModel:

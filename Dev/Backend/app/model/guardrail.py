@@ -7,18 +7,33 @@ import re
 
 from app.views import messages
 
-# Add or remove phrases here; everything else adapts. Keep entries lowercase
-# and use the apostrophe form only ("can't", not "cant") -- any phrase
-# containing "can't" automatically also matches "cant"/"cannot"/"can not",
-# since people rarely type the apostrophe. Word boundaries keep "fell" from
-# matching inside "fellow".
+# Add or remove phrases here; everything else adapts. Entries are regex
+# fragments (not escaped), so plurals/misspellings use "s?"/"e?" and word
+# boundaries are added automatically around each one -- keep entries
+# lowercase and use the apostrophe form only ("can't"/"it's"/"won't"), since
+# any phrase containing "can't" automatically also matches
+# "cant"/"cannot"/"can not" (people rarely type the apostrophe).
+#
+# "fell", "stroke", and "bleeding" are deliberately narrow: on their own they
+# block a lot of ordinary messages ("I fell asleep", "my stroke doctor", "my
+# gums are bleeding a little"), and for an older adult with a history of
+# falls, strokes, or a bleeding condition, any message mentioning it would
+# never reach the AI or the care team (see plan.md §6.7).
 EMERGENCY_PHRASES = [
-    "chest pain",
-    "can't breathe",
-    "fell",
-    "stroke",
+    "chest pains?",
+    "can't breathe?",  # also matches "breath" (common misspelling)
+    "trouble breathing",
+    "hard to breathe",
+    "i fell(?!\\s+asleep)",  # not "fell asleep"
+    "fell down",
+    "had a fall",
+    "having a stroke",
+    "think it's a stroke",
     "heart attack",
-    "bleeding",
+    "bleeding a lot",
+    "heavy bleeding",
+    "won't stop bleeding",
+    "bleeding badly",
     "suicide",
 ]
 
@@ -35,7 +50,7 @@ _WHITESPACE_RE = re.compile(r"\s+")
 _ALL_PHRASES = [
     variant for phrase in EMERGENCY_PHRASES for variant in _expand_cant_variants(phrase)
 ]
-_PHRASE_PATTERNS = [re.compile(rf"\b{re.escape(phrase)}\b") for phrase in _ALL_PHRASES]
+_PHRASE_PATTERNS = [re.compile(rf"\b{phrase}\b") for phrase in _ALL_PHRASES]
 
 
 def _normalize(text: str) -> str:
