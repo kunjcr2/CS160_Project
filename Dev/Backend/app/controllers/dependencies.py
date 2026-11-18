@@ -9,6 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session as DbSession
 
 from app.adapters.healthcare.interface import HealthcareProvider
+from app.adapters.messaging.interface import CareMessagingProvider
 from app.db import get_session
 from app.model.entities import User
 from app.model.permissions import can_access
@@ -74,3 +75,13 @@ def get_healthcare(request: Request) -> HealthcareProvider:
 # Usage:  def my_endpoint(office: Healthcare)
 # Tests can swap it:  app.dependency_overrides[get_healthcare] = lambda: MockHealthcareProvider(...)
 Healthcare = Annotated[HealthcareProvider, Depends(get_healthcare)]
+
+
+def get_messaging(request: Request) -> CareMessagingProvider:
+    """The one shared care-team messaging system, built when the app starts (main.py)."""
+    return request.app.state.messaging
+
+
+# Usage:  def my_endpoint(messaging: Messaging)
+# Tests can swap it:  app.dependency_overrides[get_messaging] = lambda: MockCareMessaging(...)
+Messaging = Annotated[CareMessagingProvider, Depends(get_messaging)]

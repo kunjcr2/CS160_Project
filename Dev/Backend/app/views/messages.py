@@ -24,8 +24,18 @@ REMINDERS = {
 }
 
 # Medication reminders (PB-03)
+MEDICATION_REMINDER = "Time to take your {name}, {dosage}."
 MEDICATION_TOO_EARLY = "It's too early for this dose. I'll remind you when it's time."
 MEDICATION_NOT_CHANGEABLE = "This reminder can't be changed anymore."
+
+# Care-team messaging (PB-07), send only
+CARE_MESSAGE_CONFIRM = 'I will send {doctor}: "{body}". Should I send it?'
+CARE_MESSAGE_SENT = "Done. Your message was sent to {doctor}."
+CARE_MESSAGE_FAILED = "I couldn't send your message to {doctor} right now. Please try again later."
+CARE_MESSAGE_RECIPIENT_UNKNOWN = "I couldn't find that doctor. Let's try again."
+CARE_MESSAGE_NOT_ALLOWED = "I can't send a message for that person."
+CARE_MESSAGE_EMPTY = "I didn't catch a message to send. What would you like to say?"
+CARE_MESSAGE_TOO_LONG = "That message is too long. Could you shorten it?"
 
 # Safety guardrails (§6.7)
 EMERGENCY_DETECTED = "This sounds like an emergency. Please call 911 now."

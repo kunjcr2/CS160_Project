@@ -1,12 +1,20 @@
 """Reminder worker and notifications (S2-10): due reminders are sent once; the screen
 learns about them by polling GET /notifications."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 
 import pytest
 
 from app.db import SessionLocal
-from app.model.entities import Appointment, AppointmentReminder, Provider, User
+from app.model.entities import (
+    Appointment,
+    AppointmentReminder,
+    Medication,
+    MedicationReminder,
+    MedicationSchedule,
+    Provider,
+    User,
+)
 from app.workers.reminders import run_once
 
 NOW = datetime(2026, 10, 19, 17, 30, tzinfo=UTC)  # Monday 10:30 AM in Los Angeles
@@ -51,8 +59,9 @@ def test_due_reminders_are_sent_once(db, appointment):
     due = add_reminder(db, appointment, "day_before", due_at=NOW - timedelta(minutes=1))
     later = add_reminder(db, appointment, "hour_before", due_at=NOW + timedelta(hours=23))
 
-    assert run_once(now=NOW) == {"appointment_reminder": 1}
-    assert run_once(now=NOW) == {"appointment_reminder": 0}  # second pass: nothing new
+    assert run_once(now=NOW) == {"appointment_reminder": 1, "medication_reminder": 0}
+    # second pass: nothing new
+    assert run_once(now=NOW) == {"appointment_reminder": 0, "medication_reminder": 0}
 
     db.refresh(due)
     db.refresh(later)
@@ -163,3 +172,72 @@ def test_a_failing_source_does_not_stop_the_worker(monkeypatch):
 
 def _user(db, appointment) -> User:
     return db.get(User, appointment.user_id)
+
+
+def add_dose(db, user, due_at=NOW, status="scheduled", **fields) -> MedicationReminder:
+    medication = Medication(user_id=user.id, name="Metformin", dosage="500 mg")
+    schedule = MedicationSchedule(time_of_day=time(8, 0))
+    medication.schedules = [schedule]
+    db.add(medication)
+    db.flush()
+    dose = MedicationReminder(
+        schedule_id=schedule.id, user_id=user.id, due_at=due_at, status=status, **fields
+    )
+    db.add(dose)
+    db.commit()
+    return dose
+
+
+def test_medication_reminder_feed_shows_sent_dose_for_its_owner_only(
+    client, db, make_user, monkeypatch
+):
+    margaret = make_user("Margaret")
+    dose = add_dose(
+        db,
+        margaret,
+        due_at=NOW - timedelta(minutes=5),
+        status="sent",
+        sent_at=NOW - timedelta(minutes=5),
+        attempts=1,
+    )
+    monkeypatch.setattr("app.model.services.notifications._utcnow", lambda: NOW)
+
+    client.login_as(margaret)
+    feed = client.get("/api/v1/notifications").json()
+
+    assert len(feed) == 1
+    item = feed[0]
+    assert item["id"] == str(dose.id)
+    assert item["kind"] == "medication_reminder"
+    assert item["status"] == "sent"
+    assert item["medication_name"] == "Metformin"
+    assert item["dosage"] == "500 mg"
+    assert item["message"] == "Time to take your Metformin, 500 mg."
+
+    client.login_as(make_user("David"))
+    assert client.get("/api/v1/notifications").json() == []
+
+
+def test_taken_and_missed_doses_still_show_their_status(client, db, make_user, monkeypatch):
+    margaret = make_user("Margaret")
+    taken = add_dose(
+        db, margaret, due_at=NOW - timedelta(minutes=10), status="taken", confirmed_at=NOW
+    )
+    missed = add_dose(
+        db, margaret, due_at=NOW - timedelta(minutes=20), status="missed", confirmed_at=NOW
+    )
+    monkeypatch.setattr("app.model.services.notifications._utcnow", lambda: NOW)
+
+    client.login_as(margaret)
+    statuses = {item["id"]: item["status"] for item in client.get("/api/v1/notifications").json()}
+
+    assert statuses[str(taken.id)] == "taken"
+    assert statuses[str(missed.id)] == "missed"
+
+
+def test_one_worker_run_sends_medication_and_appointment_reminders_together(db, appointment):
+    user = db.get(User, appointment.user_id)
+    add_reminder(db, appointment, "day_before", due_at=NOW - timedelta(minutes=1))
+    add_dose(db, user, due_at=NOW - timedelta(minutes=1))
+
+    assert run_once(now=NOW) == {"appointment_reminder": 1, "medication_reminder": 1}

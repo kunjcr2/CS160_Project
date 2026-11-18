@@ -15,10 +15,14 @@ import uuid
 from datetime import datetime, timedelta
 
 from sqlalchemy import or_, select
+from sqlalchemy.orm import Session
 from sqlalchemy.orm import Session as DbSession
 
 from app.config import settings
-from app.model.entities import MedicationReminder, User
+from app.model.entities import Medication, MedicationReminder, MedicationSchedule, User
+from app.views import messages
+
+from .reminder_source import Notification
 
 BATCH_SIZE = 100  # at most this many doses per worker run
 EARLY_WINDOW = timedelta(hours=1)  # a dose can be answered up to 1 hour before it's due
@@ -40,13 +44,13 @@ class ReminderNotChangeableError(Exception):
 
 
 class MedicationReminderSource:
-    """Medication doses for the reminder worker (same shape as Amar's ReminderSource)."""
+    """Medication doses for the reminder worker (a ReminderSource, plan §6.3, §6.4)."""
 
     kind = "medication_reminder"
 
-    def send_due(self, db: DbSession, now: datetime) -> int:
+    def send_due(self, session: Session, now: datetime) -> int:
         """Show every dose that is due. Returns how many were sent."""
-        due = db.scalars(
+        due = session.scalars(
             select(MedicationReminder)
             .where(MedicationReminder.status == "scheduled", MedicationReminder.due_at <= now)
             .order_by(MedicationReminder.due_at)
@@ -66,14 +70,14 @@ class MedicationReminderSource:
                 dose.sent_at = now
                 dose.attempts = 1
                 sent += 1
-        db.flush()
+        session.flush()
         return sent
 
-    def follow_up(self, db: DbSession, now: datetime) -> int:
+    def follow_up(self, session: Session, now: datetime) -> int:
         """Chase unanswered doses: show once more after 30 min, "missed" after 60 min."""
         reprompt_before = now - timedelta(minutes=settings.medication_reprompt_minutes)
         missed_before = now - timedelta(minutes=settings.medication_missed_minutes)
-        waiting = db.scalars(
+        waiting = session.scalars(
             select(MedicationReminder)
             .where(
                 MedicationReminder.status == "sent",
@@ -98,8 +102,42 @@ class MedicationReminderSource:
             elif dose.attempts < 2:
                 dose.attempts = 2  # the screen shows it again
                 changed += 1
-        db.flush()
+        session.flush()
         return changed
+
+    def recent_for_user(
+        self, session: Session, user: User, since: datetime, now: datetime
+    ) -> list[Notification]:
+        rows = session.execute(
+            select(MedicationReminder, Medication)
+            .join(MedicationSchedule, MedicationReminder.schedule_id == MedicationSchedule.id)
+            .join(Medication, MedicationSchedule.medication_id == Medication.id)
+            .where(
+                MedicationReminder.user_id == user.id,
+                MedicationReminder.status.in_(("sent", "taken", "missed")),
+                MedicationReminder.due_at >= since,
+                MedicationReminder.due_at <= now,
+            )
+            .order_by(MedicationReminder.due_at)
+        ).all()
+        return [to_notification(reminder, medication) for reminder, medication in rows]
+
+
+def to_notification(reminder: MedicationReminder, medication: Medication) -> Notification:
+    message = messages.MEDICATION_REMINDER.format(name=medication.name, dosage=medication.dosage)
+    return Notification(
+        kind=MedicationReminderSource.kind,
+        id=str(reminder.id),
+        due_at=reminder.due_at,
+        status=reminder.status,
+        message=message,
+        fields={
+            "medication_id": str(medication.id),
+            "medication_name": medication.name,
+            "dosage": medication.dosage,
+            "attempts": reminder.attempts,
+        },
+    )
 
 
 # ---------- User side ----------

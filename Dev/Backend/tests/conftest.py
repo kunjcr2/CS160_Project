@@ -22,7 +22,8 @@ from sqlalchemy import text  # noqa: E402
 
 from alembic import command  # noqa: E402
 from app.adapters.healthcare.mock import MockHealthcareProvider  # noqa: E402
-from app.controllers.dependencies import get_healthcare  # noqa: E402
+from app.adapters.messaging.mock import MockCareMessaging  # noqa: E402
+from app.controllers.dependencies import get_healthcare, get_messaging  # noqa: E402
 from app.db import SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.model.entities import Base, Provider, User  # noqa: E402
@@ -108,6 +109,16 @@ def mock_provider():
     app.dependency_overrides[get_healthcare] = lambda: provider
     yield provider
     app.dependency_overrides.pop(get_healthcare, None)
+
+
+@pytest.fixture
+def mock_messaging():
+    """A fresh mock messaging system per test. The API gets it through the Messaging
+    dependency; commands in service-level tests get it passed in."""
+    provider = MockCareMessaging()
+    app.dependency_overrides[get_messaging] = lambda: provider
+    yield provider
+    app.dependency_overrides.pop(get_messaging, None)
 
 
 @pytest.fixture

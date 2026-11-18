@@ -137,7 +137,10 @@ def test_cancelled_appointment_gets_no_reminders(db, make_user, chen, mock_provi
     assert reminders["day_before"].status == "sent"  # history is kept
     assert reminders["morning_of"].status == "cancelled"
     assert reminders["hour_before"].status == "cancelled"
-    assert run_once(now=appointment.starts_at - timedelta(minutes=1)) == {"appointment_reminder": 0}
+    assert run_once(now=appointment.starts_at - timedelta(minutes=1)) == {
+        "appointment_reminder": 0,
+        "medication_reminder": 0,
+    }
 
 
 # --- End to end: book, worker fires, banner shows it ------------------------------------
@@ -150,8 +153,11 @@ def test_booked_appointment_reminder_reaches_the_screen(
     appointment = _book(db, margaret, chen, mock_provider)
     day_before = reminder_times(appointment.starts_at, LA)["day_before"]
 
-    assert run_once(now=day_before - timedelta(seconds=1)) == {"appointment_reminder": 0}
-    assert run_once(now=day_before) == {"appointment_reminder": 1}
+    assert run_once(now=day_before - timedelta(seconds=1)) == {
+        "appointment_reminder": 0,
+        "medication_reminder": 0,
+    }
+    assert run_once(now=day_before) == {"appointment_reminder": 1, "medication_reminder": 0}
 
     monkeypatch.setattr("app.model.services.notifications._utcnow", lambda: day_before)
     client.login_as(margaret)

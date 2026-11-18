@@ -8,12 +8,13 @@ from sqlalchemy.orm import Session
 from app.model.entities import User
 
 from .appointment_reminders import AppointmentReminderSource
+from .medication_reminders import MedicationReminderSource
 from .reminder_source import Notification, ReminderSource
 
 appointment_reminders = AppointmentReminderSource()
+medication_reminders = MedicationReminderSource()
 
-# PB-03 (S2-06): add the medication reminder source here.
-SOURCES: list[ReminderSource] = [appointment_reminders]
+SOURCES: list[ReminderSource] = [appointment_reminders, medication_reminders]
 
 FEED_WINDOW = timedelta(hours=12)
 

@@ -11,6 +11,7 @@ from app.model.entities import (
     Medication,
     MedicationReminder,
     MedicationSchedule,
+    Message,
     Provider,
     User,
 )
@@ -81,6 +82,25 @@ def test_seed_twice_makes_no_duplicate_medications_or_doses(db):
     assert (second["medications_added"], second["doses_added"]) == (0, 0)
     assert count(db, Medication) == 4
     assert count(db, MedicationReminder) == 42
+
+
+def test_seed_gives_margaret_care_messages(db):
+    result = seed_all(db, now=NOW)
+    margaret = result["margaret"]
+    assert result["messages_added"] == 2
+    rows = list(db.scalars(select(Message).where(Message.older_adult_id == margaret.id)))
+    assert len(rows) == 2
+    assert all(row.sender_id == margaret.id for row in rows)
+    assert all(row.status == "sent" for row in rows)
+    providers = {row.provider_id for row in rows}
+    assert len(providers) == 2  # each message went to a different seeded doctor
+
+
+def test_seed_twice_makes_no_duplicate_messages(db):
+    seed_all(db, now=NOW)
+    second = seed_all(db, now=NOW)
+    assert second["messages_added"] == 0
+    assert count(db, Message) == 2
 
 
 def test_caregiver_email_with_a_different_role_is_rejected(db):

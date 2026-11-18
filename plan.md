@@ -586,6 +586,15 @@ Also: list upcoming, cancel, reschedule (each needs confirmation).
 - Replies arrive (mock can auto-reply after a delay) → notification → read aloud on request.
 - Emergency guardrail (§6.7) runs **before** proposing the send.
 
+**Built (Sprint 3): send only**, per the §17 cut order — no replies, no read status. A
+`SendCareMessage` command (`reversible = False`) checks the sender is the older adult or
+has `profile:manage` consent, that the recipient provider exists, and that the body
+isn't empty, too long, or emergency wording (`check_emergency`, §6.7 — refused with the
+911 message and nothing sent); on confirm it sends through the mock care-messaging
+adapter (`app/adapters/messaging/`) and saves a `messages` row, `failed` if the mock
+call fails. `GET /older-adults/{id}/messages` reads them back, same consent rules as
+elsewhere (not allowed → 404). Replies, read status, and threads are still to do.
+
 **Acceptance criteria:**
 - user can dictate a message; system reads/shows it back;
 - user confirms before sending; mock message is recorded/sent;
@@ -638,7 +647,7 @@ First tables built (Sprint 2, for PB-01 and PB-02): `providers`, `appointments`,
 | `medication_schedules` | medication_id, time_of_day (local, no zone), days_of_week (smallint[], 0 = Mon … 6 = Sun) | Local times; the zone is `users.timezone`. At least one day; one row per medication + time. |
 | `medication_reminders` | schedule_id, user_id, due_at (UTC), status (§6.3), attempts, sent_at, confirmed_at | MedicationReminder: one row per real dose, created 7 days ahead (`medication_days_ahead`). Unique (schedule_id, due_at), so doses are never duplicated. `confirmed_at` only for `taken`/`missed`. Polled by worker (partial indexes on `scheduled` and `sent`). |
 | `refill_requests` | user_id, medication_id, status, external_ref | RefillRequest |
-| `message_threads` / `care_messages` | user_id, provider_id / thread_id, direction, body, status, sent_at, read_at | CareMessage |
+| `messages` | sender_id, older_adult_id, provider_id, body, status (`sent`/`failed`), external_ref | CareMessage. **Built (Sprint 3, PB-07): send only** — no `direction`, `read_at`, or threads (replies deferred, §17 cut order). A `SendCareMessage` command (reversible = False) sends through the mock messaging adapter and saves this row; the emergency guardrail (§6.7) refuses before sending. |
 | `assistance_requests` | user_id, reason, summary, status, assigned_to | HumanAssistanceRequest |
 | `pending_actions` | user_id, action_type, payload (jsonb), summary_text, status, idempotency_key (unique), expires_at, result (jsonb) | §5.3. **One proposed action per user:** unique `user_id WHERE status = 'proposed'`. |
 | `conversations` / `conversation_turns` | user_id, language / role, text, created_at | Short retention |
@@ -663,7 +672,7 @@ All under `/api/v1`. All except auth and health require a valid access token. Ex
 | Appointment reminders | `POST /appointment-reminders/{id}/acknowledge` (OK button) · `GET /appointment-reminders` · `PATCH /appointment-reminders/settings` |
 | Medications | `GET /older-adults/{id}/medications` (`medications:read`) · `POST /older-adults/{id}/medications` (`medications:manage`; creates doses right away) · `GET /older-adults/{id}/medication-reminders?date=` (`medications:read`; local date, default today) · `POST /medication-reminders/{id}/taken` · `POST /medication-reminders/{id}/missed` (taken/missed: only the older adult; 409 `too_early` more than 1 h before the dose). Paths include the older adult's id so caregivers use the same endpoints under the consent rules (§5.2). |
 | Refills | `GET /refills` · *(create via actions)* |
-| Messages | `GET /messages` · `GET /messages/{threadId}` · *(send via actions)* |
+| Messages | `GET /older-adults/{id}/messages` (`profile:manage`; send only, newest first) · *(send via actions)* |
 | Assistance (handoff) | `POST /assistance` · `GET /assistance/queue` (agent) · `PATCH /assistance/{id}` (agent) |
 | Notifications | `GET /notifications` (polled every 15–30 s; reminders of every kind due in the last 12 hours, with current status) |
 
