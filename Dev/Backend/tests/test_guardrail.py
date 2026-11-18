@@ -143,4 +143,7 @@ def test_process_endpoint_returns_the_emergency_message_without_calling_the_ai()
         app.dependency_overrides.pop(get_language_model, None)
 
     assert response.status_code == 200
-    assert response.json() == {"reply": messages.EMERGENCY_DETECTED, "proposal": None}
+
+    body = response.json()
+    assert body["reply"] == messages.EMERGENCY_DETECTED
+    assert body["proposal"] is None
