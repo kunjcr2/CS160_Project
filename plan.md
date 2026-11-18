@@ -524,6 +524,17 @@ User: "I need a doctor appointment next Tuesday."
   → spoken confirmation: date, time, provider, location
 ```
 Also: list upcoming, cancel, reschedule (each needs confirmation).
+
+**Cancel and reschedule built (Sprint 4, S4-13):** two more commands on the same pipeline.
+`cancel_appointment` (payload `appointment_id`) and `reschedule_appointment` (payload
+`appointment_id` + a `slot_id` from `GET /slots`, same doctor only; another doctor is a
+cancel plus a new booking). Both work only on the user's own appointment that is still
+`booked` and hasn't started (someone else's looks the same as a missing one). Cancel marks
+the row `cancelled`, publishes `AppointmentCancelled`, then cancels at the office last, so
+an office failure rolls everything back. Reschedule reuses the booking slot checks, books
+the new time (a new `appointments` row, so the old one stays as history), marks the old
+row `cancelled`, publishes `AppointmentRescheduled`, then releases the old office booking;
+if any step fails, the new office booking is given back and nothing changes.
 **Edge cases:** slot taken before confirmation, no availability (offer next week or the office phone number), ambiguous doctor name.
 **Acceptance criteria:**
 - user can request an appointment by voice or text;
@@ -534,7 +545,7 @@ Also: list upcoming, cancel, reschedule (each needs confirmation).
 
 ### PB-02 Appointment reminders
 - A `reminder_scheduler` subscriber listens for `AppointmentBooked` and creates reminder rows (default: day before, morning of, 1 hour before; user-configurable).
-- It listens for `AppointmentCancelled` / `AppointmentRescheduled` and cancels or moves the rows. The appointment service never calls reminder code directly (Observer, §4).
+- It listens for `AppointmentCancelled` / `AppointmentRescheduled` and cancels or moves the rows (built: a rescheduled appointment's old reminders are cancelled and the new appointment gets its own, S4-13). The appointment service never calls reminder code directly (Observer, §4).
 
 **Acceptance criteria:**
 - a saved appointment can have a reminder; timing can be configured;
@@ -700,7 +711,7 @@ All under `/api/v1`. All except auth and health require a valid access token. Ex
 | Consent | `GET /consents` · `DELETE /consents/{id}` · *(later: `POST /consents` to add another caregiver)* |
 | AI / conversation | `POST /ai/process` (text in → reply, optional pending action) · `POST /ai/voice` (audio in → transcript, reply text, reply audio, optional pending action) · `POST /ai/tts` |
 | Actions (confirmation) | `POST /actions` (propose only, for the frontend and manual tests without the AI; never executes) · `GET /actions/pending` · `POST /actions/{id}/confirm` · `POST /actions/{id}/cancel` · `POST /actions/{id}/undo` |
-| Appointments | `GET /providers` · `GET /slots?provider_id&from&to` · `GET /appointments` · `GET /appointments/{id}` · *(create/cancel/reschedule via actions)* |
+| Appointments | `GET /providers` · `GET /slots?provider_id&from&to` · `GET /appointments` · `GET /appointments/{id}` · *(create/cancel/reschedule via actions: `book_appointment`, `cancel_appointment`, `reschedule_appointment`)* |
 | Appointment reminders | `POST /appointment-reminders/{id}/acknowledge` (OK button) · `GET /appointment-reminders` · `PATCH /appointment-reminders/settings` |
 | Medications | `GET /older-adults/{id}/medications` (`medications:read`) · `POST /older-adults/{id}/medications` (`medications:manage`; creates doses right away) · `GET /older-adults/{id}/medication-reminders?date=` (`medications:read`; local date, default today) · `POST /medication-reminders/{id}/taken` · `POST /medication-reminders/{id}/missed` (taken/missed: only the older adult; 409 `too_early` more than 1 h before the dose). Paths include the older adult's id so caregivers use the same endpoints under the consent rules (§5.2). |
 | Refills | `GET /older-adults/{id}/refills` (`medications:read`; statuses refreshed from the pharmacy) · *(request via actions: `request_refill`)* |

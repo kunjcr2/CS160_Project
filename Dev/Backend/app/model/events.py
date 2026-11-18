@@ -35,6 +35,15 @@ class AppointmentCancelled:
     user_id: uuid.UUID
 
 
+@dataclass(frozen=True)
+class AppointmentRescheduled:
+    """The old appointment was cancelled and replaced by a new one at another time."""
+
+    old_appointment_id: uuid.UUID
+    new_appointment_id: uuid.UUID
+    user_id: uuid.UUID
+
+
 class EventPublisher:
     def __init__(self) -> None:
         self._handlers: dict[type, list[Handler]] = defaultdict(list)

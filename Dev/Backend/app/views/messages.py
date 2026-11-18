@@ -16,6 +16,28 @@ BOOKING_SLOT_UNKNOWN = "I couldn't find that time. Let's look for another one."
 BOOKING_FAILED = "I couldn't book that, and nothing changed. You can call the office at {phone}."
 BOOKING_FAILED_NO_PHONE = "I couldn't book that, and nothing changed. Please try again later."
 
+# Cancelling and rescheduling (PB-01)
+APPOINTMENT_UNKNOWN = "I couldn't find that appointment. Let's look at your upcoming ones."
+APPOINTMENT_NOT_CHANGEABLE = "That appointment can't be changed anymore."
+CANCEL_CONFIRM = "Your appointment with {doctor} on {date} at {time}. Should I cancel it?"
+CANCEL_DONE = "Done. Your appointment with {doctor} on {date} at {time} is cancelled."
+CANCEL_FAILED = "I couldn't cancel that, and nothing changed. You can call the office at {phone}."
+CANCEL_FAILED_NO_PHONE = "I couldn't cancel that, and nothing changed. Please try again later."
+RESCHEDULE_CONFIRM = (
+    "I will move your appointment with {doctor} from {old} to {new}, at {location}. "
+    "Should I move it?"
+)
+RESCHEDULE_DONE = "Done. Your appointment with {doctor} is now on {date} at {time}."
+RESCHEDULE_OTHER_DOCTOR = (
+    "That time is with a different doctor. I can cancel this appointment and book a new one."
+)
+RESCHEDULE_FAILED = (
+    "I couldn't move that, and your appointment is unchanged. You can call the office at {phone}."
+)
+RESCHEDULE_FAILED_NO_PHONE = (
+    "I couldn't move that, and your appointment is unchanged. Please try again later."
+)
+
 # Appointment reminders (PB-02), keyed by AppointmentReminder.kind
 REMINDERS = {
     "day_before": "Reminder: you see {doctor} tomorrow at {time}, at {location}.",

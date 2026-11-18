@@ -3,7 +3,14 @@ command registry.
 """
 
 # Importing a command module registers it.
-from . import book_appointment, request_help, request_refill, send_care_message  # noqa: F401
+from . import (  # noqa: F401
+    book_appointment,
+    cancel_appointment,
+    request_help,
+    request_refill,
+    reschedule_appointment,
+    send_care_message,
+)
 from .base import ActionCommand, ActionNotPossible
 from .registry import UnknownActionType, build, register, registered_types
 

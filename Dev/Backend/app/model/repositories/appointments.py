@@ -53,3 +53,15 @@ def get_owned(
     return session.scalar(
         select(Appointment).where(Appointment.id == appointment_id, Appointment.user_id == user_id)
     )
+
+
+def lock_owned(
+    session: Session, appointment_id: uuid.UUID, user_id: uuid.UUID
+) -> Appointment | None:
+    """The user's appointment, locked until commit, so it can't be cancelled or moved twice
+    at the same time."""
+    return session.scalar(
+        select(Appointment)
+        .where(Appointment.id == appointment_id, Appointment.user_id == user_id)
+        .with_for_update()
+    )
