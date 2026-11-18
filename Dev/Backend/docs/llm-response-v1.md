@@ -1,3 +1,6 @@
+> This document records the earlier structured JSON prototype. The current
+> function-calling contract is in [conversation-voice.md](conversation-voice.md).
+
 ```powershell
 PS C:\Users\kunjs\Downloads\Projects\CS160_Project> @'
 >> {"text":"I need an appointment with Dr. Chen next Tuesday.","language":"en"}
