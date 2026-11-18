@@ -1,6 +1,6 @@
 """Every sentence the backend says to the user, in one place (English only for now).
 
-Keep wording short and plain (plan §13); reword freely after usability tests.
+Keep wording short and plain; reword freely after usability tests.
 Services fill the {placeholders} with str.format(). Multilingual support (PB-05)
 is deferred; if it returns, this file becomes the English template set.
 """
@@ -11,7 +11,10 @@ BOOKING_CONFIRM = "{doctor}, {specialty}, {date} at {time}, at {location}. Shoul
 BOOKING_DONE = "Done. You're booked with {doctor} on {date} at {time}."
 BOOKING_NO_AVAILABILITY = "{doctor} has no open times then. Should I check the next week?"
 BOOKING_SLOT_TAKEN = "Sorry, that time was just taken. The next open times are: {options}."
+BOOKING_SLOT_TAKEN_NO_OPTIONS = "Sorry, that time was just taken. Let's look for another time."
+BOOKING_SLOT_UNKNOWN = "I couldn't find that time. Let's look for another one."
 BOOKING_FAILED = "I couldn't book that, and nothing changed. You can call the office at {phone}."
+BOOKING_FAILED_NO_PHONE = "I couldn't book that, and nothing changed. Please try again later."
 
 # Appointment reminders (PB-02), keyed by AppointmentReminder.kind
 REMINDERS = {
@@ -20,15 +23,38 @@ REMINDERS = {
     "hour_before": "Your appointment with {doctor} is in one hour, at {location}.",
 }
 
-# Confirmation (plan §5.3)
+# Medication reminders (PB-03)
+MEDICATION_REMINDER = "Time to take your {name}, {dosage}."
+MEDICATION_TOO_EARLY = "It's too early for this dose. I'll remind you when it's time."
+MEDICATION_NOT_CHANGEABLE = "This reminder can't be changed anymore."
+
+# Care-team messaging (PB-07), send only
+CARE_MESSAGE_CONFIRM = 'I will send {doctor}: "{body}". Should I send it?'
+CARE_MESSAGE_SENT = "Done. Your message was sent to {doctor}."
+CARE_MESSAGE_FAILED = "I couldn't send your message to {doctor} right now. Please try again later."
+CARE_MESSAGE_RECIPIENT_UNKNOWN = "I couldn't find that doctor. Let's try again."
+CARE_MESSAGE_NOT_ALLOWED = "I can't send a message for that person."
+CARE_MESSAGE_EMPTY = "I didn't catch a message to send. What would you like to say?"
+CARE_MESSAGE_TOO_LONG = "That message is too long. Could you shorten it?"
+
+# Safety guardrails (§6.7)
+EMERGENCY_DETECTED = "This sounds like an emergency. Please call 911 now."
+
+# Confirmation
 CONFIRM_UNCLEAR = "I didn't catch a yes or a no. Should I go ahead?"
 ACTION_CANCELLED = "Okay, I won't do that."
 ACTION_EXPIRED = "That request timed out, so I didn't do anything. We can start again."
+ACTION_ALREADY_DONE = "That's already done."
+ACTION_NOT_PENDING = "That request is no longer waiting for an answer, so I didn't do anything."
 
-# Errors and fallback (plan §7)
+# Errors and fallback
 NOT_UNDERSTOOD = "Sorry, I didn't understand. Could you say that another way?"
 OFFER_HUMAN_HELP = "I'm having trouble with this. Would you like me to connect you with a person?"
 SERVICE_UNAVAILABLE = "Something went wrong on my end, and nothing was changed. Please try again."
+
+# Sign-in
+PAIRING_CODE_INVALID = "That code didn't work. Please ask your helper for a new one."
+TOO_MANY_ATTEMPTS = "Too many attempts. Please wait a minute and try again."
 
 # Conversation (SR-08). These replies accompany proposals only; another controller
 # will persist and confirm any action before it can be carried out.
