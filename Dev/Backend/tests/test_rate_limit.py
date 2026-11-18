@@ -5,7 +5,7 @@ from fastapi import HTTPException, Request
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.model.rate_limit import RateLimiter, enforce_rate_limit
+from app.model.rate_limit import RateLimiter, enforce_register_rate_limit
 from app.views import messages
 
 PASSWORD = "correct horse battery"
@@ -139,7 +139,7 @@ def test_limit_resets_after_the_window_elapses_via_api(client):
     def fake_enforce_rate_limit(request: Request) -> None:
         test_limiter.check(request.client.host)
 
-    app.dependency_overrides[enforce_rate_limit] = fake_enforce_rate_limit
+    app.dependency_overrides[enforce_register_rate_limit] = fake_enforce_rate_limit
     try:
         for i in range(5):
             assert register(client, email=f"reset{i}@example.com").status_code == 201
@@ -148,4 +148,15 @@ def test_limit_resets_after_the_window_elapses_via_api(client):
         clock.advance(61)  # past the window
         assert register(client, email="reset-after-window@example.com").status_code == 201
     finally:
-        app.dependency_overrides.pop(enforce_rate_limit, None)
+        app.dependency_overrides.pop(enforce_register_rate_limit, None)
+
+
+def test_failed_login_does_not_use_up_register_or_pair_tries(client):
+    register(client)
+    for _ in range(5):
+        login(client, password="wrong password")
+    assert login(client).status_code == 429  # login's own count is now exhausted
+
+    # register and pair have their own, untouched counts for the same IP
+    assert register(client, email="separate-count@example.com").status_code == 201
+    assert pair(client).status_code == 401  # a normal "wrong code" reply, not 429

@@ -53,16 +53,28 @@ class RateLimiter:
         self._attempts.clear()
 
 
-# One shared limiter for the whole app process.
+# One shared limiter for the whole app process. Each endpoint gets its own count per
+# IP (keyed by "<name>:<ip>"), so using up login's tries doesn't block register or pair.
 _auth_rate_limiter = RateLimiter(
     settings.rate_limit_max_attempts, settings.rate_limit_window_seconds
 )
 
 
-def enforce_rate_limit(request: Request) -> None:
-    """FastAPI dependency: 429s once the caller's IP exceeds the configured attempt limit."""
-    ip = request.client.host if request.client else "unknown"
-    _auth_rate_limiter.check(ip)
+def _rate_limit_dependency(name: str) -> Callable[[Request], None]:
+    """Build a FastAPI dependency that 429s once the caller's IP exceeds the configured
+    attempt limit for this endpoint alone.
+    """
+
+    def enforce(request: Request) -> None:
+        ip = request.client.host if request.client else "unknown"
+        _auth_rate_limiter.check(f"{name}:{ip}")
+
+    return enforce
+
+
+enforce_register_rate_limit = _rate_limit_dependency("register")
+enforce_login_rate_limit = _rate_limit_dependency("login")
+enforce_pair_rate_limit = _rate_limit_dependency("pair")
 
 
 def reset_rate_limit_store() -> None:

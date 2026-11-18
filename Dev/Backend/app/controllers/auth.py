@@ -7,7 +7,11 @@ from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.controllers.dependencies import CurrentUser, Db
-from app.model.rate_limit import enforce_rate_limit
+from app.model.rate_limit import (
+    enforce_login_rate_limit,
+    enforce_pair_rate_limit,
+    enforce_register_rate_limit,
+)
 from app.model.services import auth_service
 from app.model.services.auth_service import (
     EmailAlreadyRegistered,
@@ -53,7 +57,7 @@ def _clear_refresh_cookie(response: Response) -> None:
     "/register",
     status_code=status.HTTP_201_CREATED,
     response_model=UserResponse,
-    dependencies=[Depends(enforce_rate_limit)],
+    dependencies=[Depends(enforce_register_rate_limit)],
 )
 def register(body: RegisterRequest, db: Db) -> UserResponse:
     """Create a caregiver account."""
@@ -66,7 +70,9 @@ def register(body: RegisterRequest, db: Db) -> UserResponse:
     return UserResponse.model_validate(user)
 
 
-@router.post("/login", response_model=TokenResponse, dependencies=[Depends(enforce_rate_limit)])
+@router.post(
+    "/login", response_model=TokenResponse, dependencies=[Depends(enforce_login_rate_limit)]
+)
 def login(body: LoginRequest, response: Response, db: Db) -> TokenResponse:
     """Email + password → access token (JSON) + refresh token (cookie)."""
     try:
@@ -131,7 +137,7 @@ def create_pairing_code(body: PairingCodeRequest, user: CurrentUser, db: Db) -> 
     return PairingCodeResponse(code=code, expires_at=expires_at)
 
 
-@router.post("/pair", response_model=TokenResponse, dependencies=[Depends(enforce_rate_limit)])
+@router.post("/pair", response_model=TokenResponse, dependencies=[Depends(enforce_pair_rate_limit)])
 def pair(body: PairRequest, response: Response, db: Db) -> TokenResponse:
     """Older adult's device: code → access token + refresh cookie."""
     try:
