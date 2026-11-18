@@ -60,6 +60,16 @@ REFILL_STATUS = {
     "ready": "Your {name} is ready to pick up.",
 }
 
+# Human assistance (PB-06): a help request shown in a support queue
+HELP_CONFIRM = 'I will ask a support person to contact you about: "{summary}". Should I do that?'
+HELP_CONFIRM_NO_SUMMARY = "I will ask a support person to contact you. Should I do that?"
+HELP_REQUESTED = (
+    "Done. A support person will contact you soon. If this is an emergency, call 911 now."
+)
+HELP_ALREADY_REQUESTED = "You already asked for help, and a support person will contact you soon."
+HELP_NOT_ALLOWED = "I can't ask for help for that person."
+HELP_SUMMARY_TOO_LONG = "That's a lot of detail. Could you say it more briefly?"
+
 # Safety guardrails (§6.7)
 EMERGENCY_DETECTED = "This sounds like an emergency. Please call 911 now."
 

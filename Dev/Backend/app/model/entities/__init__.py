@@ -1,6 +1,7 @@
 """Import every model here so Alembic autogenerate sees them."""
 
 from .appointment import Appointment, AppointmentReminder
+from .assistance_request import AssistanceRequest
 from .base import Base
 from .consent_grant import ConsentGrant
 from .medication import Medication, MedicationReminder, MedicationSchedule
@@ -27,4 +28,5 @@ __all__ = [
     "MedicationReminder",
     "Message",
     "RefillRequest",
+    "AssistanceRequest",
 ]

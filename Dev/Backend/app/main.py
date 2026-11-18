@@ -18,6 +18,7 @@ from app.config import settings
 from app.controllers import (
     actions,
     appointments,
+    assistance,
     auth,
     consents,
     health,
@@ -93,6 +94,7 @@ def create_app() -> FastAPI:
     app.include_router(medications.router, prefix="/api/v1")
     app.include_router(messages.router, prefix="/api/v1")
     app.include_router(refills.router, prefix="/api/v1")
+    app.include_router(assistance.router, prefix="/api/v1")
     app.include_router(actions.router, prefix="/api/v1")
     app.include_router(appointments.router, prefix="/api/v1")
     app.include_router(notifications.router, prefix="/api/v1")
