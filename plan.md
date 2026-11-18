@@ -555,6 +555,22 @@ Also: list upcoming, cancel, reschedule (each needs confirmation).
 - "I'm almost out of my blood pressure pill" → match against the user's active prescriptions (fuzzy match; confirm which one if unclear) → pending action → submit to mock pharmacy → track status (`requested → in_progress → ready`) → spoken update.
 - **Edge cases:** no refills remaining (tell them to contact the doctor; offer PB-07), unknown medication.
 
+**Built (Sprint 4, S4-11):** a `RequestRefill` command (`request_refill`, `reversible = False`).
+The payload names the older adult and either a `medication_id` or a `medication_name` with
+what the user said; the name is matched against their active medications, by medicine
+name first and then by its instructions ("blood pressure pill" → Lisinopril, "For blood
+pressure"). Several matches are refused with "Which one do you mean: …?", never guessed.
+It also refuses: no consent (the older adult themself or `medications:manage`), a stopped
+or unknown medicine, no refills left (points to the doctor and offers PB-07), and a refill
+already open for that medicine (one open request per medication, enforced by a partial
+unique index). On confirm it locks the medication row, uses one refill, saves a
+`refill_requests` row, and submits it to the mock pharmacy (`app/adapters/pharmacy/`);
+if the pharmacy is down, the savepoint rolls everything back and nothing changes.
+`GET /older-adults/{id}/refills` (`medications:read`) asks the pharmacy for progress
+(`requested → in_progress → ready`, only ever forward) and returns each request with a
+sentence to speak. The mock pharmacy is in-memory, like the mock office: after a restart
+the last saved status is kept. Not built: a notification when a refill becomes ready.
+
 **Acceptance criteria:**
 - user can request a refill; system identifies the medication;
 - system confirms before submission;
@@ -646,7 +662,7 @@ First tables built (Sprint 2, for PB-01 and PB-02): `providers`, `appointments`,
 | `medications` | user_id, name, dosage, instructions, refills_remaining (≥ 0), stopped_at | Medication. `pharmacy_contact_id` comes later with the contacts table (PB-04). `stopped_at` set = no new doses. |
 | `medication_schedules` | medication_id, time_of_day (local, no zone), days_of_week (smallint[], 0 = Mon … 6 = Sun) | Local times; the zone is `users.timezone`. At least one day; one row per medication + time. |
 | `medication_reminders` | schedule_id, user_id, due_at (UTC), status (§6.3), attempts, sent_at, confirmed_at | MedicationReminder: one row per real dose, created 7 days ahead (`medication_days_ahead`). Unique (schedule_id, due_at), so doses are never duplicated. `confirmed_at` only for `taken`/`missed`. Polled by worker (partial indexes on `scheduled` and `sent`). |
-| `refill_requests` | user_id, medication_id, status, external_ref | RefillRequest |
+| `refill_requests` | user_id, requested_by, medication_id, status (`requested`/`in_progress`/`ready`), external_ref | RefillRequest. **Built (S4-11).** One open request per medication: unique `medication_id WHERE status IN ('requested', 'in_progress')`. |
 | `messages` | sender_id, older_adult_id, provider_id, body, status (`sent`/`failed`), external_ref | CareMessage. **Built (Sprint 3, PB-07): send only** — no `direction`, `read_at`, or threads (replies deferred, §17 cut order). A `SendCareMessage` command (reversible = False) sends through the mock messaging adapter and saves this row; the emergency guardrail (§6.7) refuses before sending. |
 | `assistance_requests` | user_id, reason, summary, status, assigned_to | HumanAssistanceRequest |
 | `pending_actions` | user_id, action_type, payload (jsonb), summary_text, status, idempotency_key (unique), expires_at, result (jsonb) | §5.3. **One proposed action per user:** unique `user_id WHERE status = 'proposed'`. |
@@ -671,7 +687,7 @@ All under `/api/v1`. All except auth and health require a valid access token. Ex
 | Appointments | `GET /providers` · `GET /slots?provider_id&from&to` · `GET /appointments` · `GET /appointments/{id}` · *(create/cancel/reschedule via actions)* |
 | Appointment reminders | `POST /appointment-reminders/{id}/acknowledge` (OK button) · `GET /appointment-reminders` · `PATCH /appointment-reminders/settings` |
 | Medications | `GET /older-adults/{id}/medications` (`medications:read`) · `POST /older-adults/{id}/medications` (`medications:manage`; creates doses right away) · `GET /older-adults/{id}/medication-reminders?date=` (`medications:read`; local date, default today) · `POST /medication-reminders/{id}/taken` · `POST /medication-reminders/{id}/missed` (taken/missed: only the older adult; 409 `too_early` more than 1 h before the dose). Paths include the older adult's id so caregivers use the same endpoints under the consent rules (§5.2). |
-| Refills | `GET /refills` · *(create via actions)* |
+| Refills | `GET /older-adults/{id}/refills` (`medications:read`; statuses refreshed from the pharmacy) · *(request via actions: `request_refill`)* |
 | Messages | `GET /older-adults/{id}/messages` (`profile:manage`; send only, newest first) · *(send via actions)* |
 | Assistance (handoff) | `POST /assistance` · `GET /assistance/queue` (agent) · `PATCH /assistance/{id}` (agent) |
 | Notifications | `GET /notifications` (polled every 15–30 s; reminders of every kind due in the last 12 hours, with current status) |

@@ -11,8 +11,9 @@ from fastapi import APIRouter, HTTPException, status
 
 from app.adapters.healthcare.interface import HealthcareProvider
 from app.adapters.messaging.interface import CareMessagingProvider
+from app.adapters.pharmacy.interface import PharmacyProvider
 from app.config import settings
-from app.controllers.dependencies import CurrentUser, Db, Healthcare, Messaging
+from app.controllers.dependencies import CurrentUser, Db, Healthcare, Messaging, Pharmacy
 from app.model.commands import ActionNotPossible, UnknownActionType
 from app.model.services.action_service import ActionNotFound, ActionNotPending, ActionService
 from app.views import messages
@@ -25,11 +26,13 @@ def _service(
     session,
     office: HealthcareProvider | None = None,
     messaging: CareMessagingProvider | None = None,
+    pharmacy: PharmacyProvider | None = None,
 ) -> ActionService:
     return ActionService(
         session,
         healthcare=office,
         messaging=messaging,
+        pharmacy=pharmacy,
         ttl=timedelta(minutes=settings.pending_action_ttl_minutes),
     )
 
@@ -42,7 +45,12 @@ def _not_found() -> HTTPException:
 
 @router.post("", response_model=ActionOut, status_code=status.HTTP_201_CREATED)
 def propose_action(
-    body: ProposeActionIn, user: CurrentUser, session: Db, office: Healthcare, messaging: Messaging
+    body: ProposeActionIn,
+    user: CurrentUser,
+    session: Db,
+    office: Healthcare,
+    messaging: Messaging,
+    pharmacy: Pharmacy,
 ) -> ActionOut:
     """Create a proposal to read back to the user. This never executes anything.
 
@@ -50,7 +58,9 @@ def propose_action(
     and manual tests do the same without the AI. A new proposal replaces the old one.
     """
     try:
-        action = _service(session, office, messaging).propose(user, body.action_type, body.payload)
+        action = _service(session, office, messaging, pharmacy).propose(
+            user, body.action_type, body.payload
+        )
     except UnknownActionType:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -73,7 +83,12 @@ def get_pending_action(user: CurrentUser, session: Db) -> PendingActionOut:
 
 @router.post("/{action_id}/confirm", response_model=ActionOutcomeOut)
 def confirm_action(
-    action_id: uuid.UUID, user: CurrentUser, session: Db, office: Healthcare, messaging: Messaging
+    action_id: uuid.UUID,
+    user: CurrentUser,
+    session: Db,
+    office: Healthcare,
+    messaging: Messaging,
+    pharmacy: Pharmacy,
 ):
     """The user said yes. Safe to call twice: it never executes twice.
 
@@ -81,7 +96,7 @@ def confirm_action(
     404 not found or not yours · 409 cancelled, replaced, or expired.
     """
     try:
-        outcome = _service(session, office, messaging).confirm(action_id, user)
+        outcome = _service(session, office, messaging, pharmacy).confirm(action_id, user)
     except ActionNotFound:
         raise _not_found() from None
     except ActionNotPending as error:

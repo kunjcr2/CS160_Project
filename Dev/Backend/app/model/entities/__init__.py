@@ -8,6 +8,7 @@ from .message import Message
 from .pairing_code import PairingCode
 from .pending_action import PendingAction
 from .provider import Provider
+from .refill_request import RefillRequest
 from .session import Session
 from .user import User
 
@@ -25,4 +26,5 @@ __all__ = [
     "MedicationSchedule",
     "MedicationReminder",
     "Message",
+    "RefillRequest",
 ]

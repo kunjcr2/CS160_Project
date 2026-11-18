@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.adapters.healthcare.interface import HealthcareProvider
 from app.adapters.messaging.interface import CareMessagingProvider
+from app.adapters.pharmacy.interface import PharmacyProvider
 from app.model import commands
 from app.model.commands import ActionNotPossible
 from app.model.entities import PendingAction, User
@@ -57,12 +58,14 @@ class ActionService:
         *,
         healthcare: HealthcareProvider | None = None,
         messaging: CareMessagingProvider | None = None,
+        pharmacy: PharmacyProvider | None = None,
         clock: Callable[[], datetime] = _utcnow,
         ttl: timedelta = DEFAULT_TTL,
     ) -> None:
         self.session = session
         self.healthcare = healthcare  # handed to commands that talk to the doctor's office
         self.messaging = messaging  # handed to commands that message the care team
+        self.pharmacy = pharmacy  # handed to commands that request refills
         self.clock = clock
         self.ttl = ttl
 
@@ -71,9 +74,7 @@ class ActionService:
 
         Raises UnknownActionType or ActionNotPossible (e.g. the slot is already taken).
         """
-        command = commands.build(
-            action_type, user, payload, healthcare=self.healthcare, messaging=self.messaging
-        )
+        command = commands.build(action_type, user, payload, **self._adapters())
         command.revalidate(self.session)
         summary = command.summary(self.session)
 
@@ -116,13 +117,7 @@ class ActionService:
         if self._expire_if_due(action):
             return ActionOutcome(action, messages.ACTION_EXPIRED)
 
-        command = commands.build(
-            action.action_type,
-            user,
-            action.payload,
-            healthcare=self.healthcare,
-            messaging=self.messaging,
-        )
+        command = commands.build(action.action_type, user, action.payload, **self._adapters())
         action.status = "confirmed"
         try:
             # Savepoint: if anything below fails, its database writes are undone, but the
@@ -161,6 +156,14 @@ class ActionService:
         if action.status != "cancelled":
             raise ActionNotPending(action, _not_pending_message(action.status))
         return ActionOutcome(action, messages.ACTION_CANCELLED)
+
+    def _adapters(self) -> dict:
+        """The outside systems handed to every command (each uses only what it needs)."""
+        return {
+            "healthcare": self.healthcare,
+            "messaging": self.messaging,
+            "pharmacy": self.pharmacy,
+        }
 
     def _expire_if_due(self, action: PendingAction) -> bool:
         if action.expires_at > self.clock():

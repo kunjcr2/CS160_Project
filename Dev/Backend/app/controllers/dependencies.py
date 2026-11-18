@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from app.adapters.healthcare.interface import HealthcareProvider
 from app.adapters.messaging.interface import CareMessagingProvider
+from app.adapters.pharmacy.interface import PharmacyProvider
 from app.db import get_session
 from app.model.entities import User
 from app.model.permissions import can_access
@@ -85,3 +86,13 @@ def get_messaging(request: Request) -> CareMessagingProvider:
 # Usage:  def my_endpoint(messaging: Messaging)
 # Tests can swap it:  app.dependency_overrides[get_messaging] = lambda: MockCareMessaging(...)
 Messaging = Annotated[CareMessagingProvider, Depends(get_messaging)]
+
+
+def get_pharmacy(request: Request) -> PharmacyProvider:
+    """The one shared pharmacy, built when the app starts (main.py)."""
+    return request.app.state.pharmacy
+
+
+# Usage:  def my_endpoint(pharmacy: Pharmacy)
+# Tests can swap it:  app.dependency_overrides[get_pharmacy] = lambda: MockPharmacy(...)
+Pharmacy = Annotated[PharmacyProvider, Depends(get_pharmacy)]

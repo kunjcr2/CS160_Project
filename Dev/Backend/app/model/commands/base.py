@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.adapters.healthcare.interface import HealthcareProvider
 from app.adapters.messaging.interface import CareMessagingProvider
+from app.adapters.pharmacy.interface import PharmacyProvider
 from app.model.entities import User
 
 
@@ -38,11 +39,13 @@ class ActionCommand(ABC):
         *,
         healthcare: HealthcareProvider | None = None,
         messaging: CareMessagingProvider | None = None,
+        pharmacy: PharmacyProvider | None = None,
     ) -> None:
         self.user = user
         self.payload = payload
         self.healthcare = healthcare
         self.messaging = messaging
+        self.pharmacy = pharmacy
 
     @abstractmethod
     def summary(self, session: Session) -> str:

@@ -37,6 +37,29 @@ CARE_MESSAGE_NOT_ALLOWED = "I can't send a message for that person."
 CARE_MESSAGE_EMPTY = "I didn't catch a message to send. What would you like to say?"
 CARE_MESSAGE_TOO_LONG = "That message is too long. Could you shorten it?"
 
+# Prescription refills (PB-04)
+REFILL_CONFIRM = (
+    "I will ask the pharmacy to refill your {name}, {dosage}. Should I send the request?"
+)
+REFILL_REQUESTED = (
+    "Done. I sent the refill request for your {name} to the pharmacy. "
+    "You can ask me any time if it's ready."
+)
+REFILL_FAILED = "I couldn't reach the pharmacy, and nothing was changed. Please try again later."
+REFILL_UNKNOWN_MEDICATION = "I couldn't find that medicine in your list. Which one do you need?"
+REFILL_WHICH_ONE = "Which one do you mean: {options}?"
+REFILL_NONE_LEFT = (
+    "You have no refills left for your {name}, so your doctor needs to renew it. "
+    "Would you like me to send them a message?"
+)
+REFILL_ALREADY_REQUESTED = "A refill for your {name} is already on its way."
+REFILL_NOT_ALLOWED = "I can't request a refill for that person."
+REFILL_STATUS = {
+    "requested": "Your {name} refill request was sent to the pharmacy.",
+    "in_progress": "The pharmacy is preparing your {name}.",
+    "ready": "Your {name} is ready to pick up.",
+}
+
 # Safety guardrails (§6.7)
 EMERGENCY_DETECTED = "This sounds like an emergency. Please call 911 now."
 

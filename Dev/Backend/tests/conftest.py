@@ -23,7 +23,8 @@ from sqlalchemy import text  # noqa: E402
 from alembic import command  # noqa: E402
 from app.adapters.healthcare.mock import MockHealthcareProvider  # noqa: E402
 from app.adapters.messaging.mock import MockCareMessaging  # noqa: E402
-from app.controllers.dependencies import get_healthcare, get_messaging  # noqa: E402
+from app.adapters.pharmacy.mock import MockPharmacy  # noqa: E402
+from app.controllers.dependencies import get_healthcare, get_messaging, get_pharmacy  # noqa: E402
 from app.db import SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.model.entities import Base, Provider, User  # noqa: E402
@@ -119,6 +120,15 @@ def mock_messaging():
     app.dependency_overrides[get_messaging] = lambda: provider
     yield provider
     app.dependency_overrides.pop(get_messaging, None)
+
+
+@pytest.fixture
+def mock_pharmacy():
+    """A fresh mock pharmacy per test (PB-04), handed to the API like the other mocks."""
+    pharmacy = MockPharmacy()
+    app.dependency_overrides[get_pharmacy] = lambda: pharmacy
+    yield pharmacy
+    app.dependency_overrides.pop(get_pharmacy, None)
 
 
 @pytest.fixture
