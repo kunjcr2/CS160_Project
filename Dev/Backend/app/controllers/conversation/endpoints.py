@@ -10,6 +10,7 @@ from app.adapters.llm.client import LanguageModel, build_language_model
 from app.config import settings
 from app.controllers.conversation.orchestrator import ConversationOrchestrator
 from app.controllers.conversation.tools import Proposal
+from app.model.guardrail import check_emergency
 from app.views import messages
 
 router = APIRouter(prefix="/ai", tags=["conversation"])
@@ -40,6 +41,9 @@ def get_language_model() -> LanguageModel:
 @router.post("/process", response_model=ProcessResponse)
 def process_text(request: ProcessRequest, language_model: LanguageModel = Depends(get_language_model)) -> ProcessResponse:
     """Interpret text into a proposal. This endpoint never creates or confirms an action."""
+    emergency_reply = check_emergency(request.text)
+    if emergency_reply is not None:
+        return ProcessResponse(reply=emergency_reply, proposal=None)
     try:
         result = ConversationOrchestrator(language_model).process(request.text, request.language)
     except OpenAIError as error:
