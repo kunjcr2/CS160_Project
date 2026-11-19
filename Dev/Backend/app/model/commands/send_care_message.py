@@ -10,7 +10,7 @@ import uuid
 
 from sqlalchemy.orm import Session
 
-from app.adapters.messaging.interface import CareMessagingProvider, MessagingUnavailableError
+from app.adapters.messaging.interface import MessagingUnavailableError
 from app.model.entities import Message, Provider, User
 from app.model.entities.message import MESSAGE_BODY_MAX_LENGTH
 from app.model.guardrail import check_emergency
@@ -36,15 +36,8 @@ class SendCareMessage(ActionCommand):
     action_type = "send_care_message"
     reversible = False  # a sent message can't be unsent
 
-    def __init__(
-        self,
-        user: User,
-        payload: dict,
-        *,
-        healthcare=None,
-        messaging: CareMessagingProvider | None = None,
-    ) -> None:
-        super().__init__(user, payload, healthcare=healthcare, messaging=messaging)
+    def __init__(self, user: User, payload: dict, **adapters) -> None:
+        super().__init__(user, payload, **adapters)
         self.body = str(payload.get("body", "")).strip()
         try:
             self.older_adult_id = uuid.UUID(str(payload.get("older_adult_id", "")))

@@ -1,6 +1,12 @@
 """Observers of domain events: reminder scheduler, notifier, audit logger."""
 
-from app.model.events import AppointmentBooked, AppointmentCancelled, EventPublisher, events
+from app.model.events import (
+    AppointmentBooked,
+    AppointmentCancelled,
+    AppointmentRescheduled,
+    EventPublisher,
+    events,
+)
 
 from . import reminder_scheduler
 
@@ -10,3 +16,4 @@ def register_all(publisher: EventPublisher = events) -> None:
     (app/main.py); calling it again is harmless."""
     publisher.subscribe(AppointmentBooked, reminder_scheduler.on_appointment_booked)
     publisher.subscribe(AppointmentCancelled, reminder_scheduler.on_appointment_cancelled)
+    publisher.subscribe(AppointmentRescheduled, reminder_scheduler.on_appointment_rescheduled)

@@ -16,6 +16,28 @@ BOOKING_SLOT_UNKNOWN = "I couldn't find that time. Let's look for another one."
 BOOKING_FAILED = "I couldn't book that, and nothing changed. You can call the office at {phone}."
 BOOKING_FAILED_NO_PHONE = "I couldn't book that, and nothing changed. Please try again later."
 
+# Cancelling and rescheduling (PB-01)
+APPOINTMENT_UNKNOWN = "I couldn't find that appointment. Let's look at your upcoming ones."
+APPOINTMENT_NOT_CHANGEABLE = "That appointment can't be changed anymore."
+CANCEL_CONFIRM = "Your appointment with {doctor} on {date} at {time}. Should I cancel it?"
+CANCEL_DONE = "Done. Your appointment with {doctor} on {date} at {time} is cancelled."
+CANCEL_FAILED = "I couldn't cancel that, and nothing changed. You can call the office at {phone}."
+CANCEL_FAILED_NO_PHONE = "I couldn't cancel that, and nothing changed. Please try again later."
+RESCHEDULE_CONFIRM = (
+    "I will move your appointment with {doctor} from {old} to {new}, at {location}. "
+    "Should I move it?"
+)
+RESCHEDULE_DONE = "Done. Your appointment with {doctor} is now on {date} at {time}."
+RESCHEDULE_OTHER_DOCTOR = (
+    "That time is with a different doctor. I can cancel this appointment and book a new one."
+)
+RESCHEDULE_FAILED = (
+    "I couldn't move that, and your appointment is unchanged. You can call the office at {phone}."
+)
+RESCHEDULE_FAILED_NO_PHONE = (
+    "I couldn't move that, and your appointment is unchanged. Please try again later."
+)
+
 # Appointment reminders (PB-02), keyed by AppointmentReminder.kind
 REMINDERS = {
     "day_before": "Reminder: you see {doctor} tomorrow at {time}, at {location}.",
@@ -36,6 +58,39 @@ CARE_MESSAGE_RECIPIENT_UNKNOWN = "I couldn't find that doctor. Let's try again."
 CARE_MESSAGE_NOT_ALLOWED = "I can't send a message for that person."
 CARE_MESSAGE_EMPTY = "I didn't catch a message to send. What would you like to say?"
 CARE_MESSAGE_TOO_LONG = "That message is too long. Could you shorten it?"
+
+# Prescription refills (PB-04)
+REFILL_CONFIRM = (
+    "I will ask the pharmacy to refill your {name}, {dosage}. Should I send the request?"
+)
+REFILL_REQUESTED = (
+    "Done. I sent the refill request for your {name} to the pharmacy. "
+    "You can ask me any time if it's ready."
+)
+REFILL_FAILED = "I couldn't reach the pharmacy, and nothing was changed. Please try again later."
+REFILL_UNKNOWN_MEDICATION = "I couldn't find that medicine in your list. Which one do you need?"
+REFILL_WHICH_ONE = "Which one do you mean: {options}?"
+REFILL_NONE_LEFT = (
+    "You have no refills left for your {name}, so your doctor needs to renew it. "
+    "Would you like me to send them a message?"
+)
+REFILL_ALREADY_REQUESTED = "A refill for your {name} is already on its way."
+REFILL_NOT_ALLOWED = "I can't request a refill for that person."
+REFILL_STATUS = {
+    "requested": "Your {name} refill request was sent to the pharmacy.",
+    "in_progress": "The pharmacy is preparing your {name}.",
+    "ready": "Your {name} is ready to pick up.",
+}
+
+# Human assistance (PB-06): a help request shown in a support queue
+HELP_CONFIRM = 'I will ask a support person to contact you about: "{summary}". Should I do that?'
+HELP_CONFIRM_NO_SUMMARY = "I will ask a support person to contact you. Should I do that?"
+HELP_REQUESTED = (
+    "Done. A support person will contact you soon. If this is an emergency, call 911 now."
+)
+HELP_ALREADY_REQUESTED = "You already asked for help, and a support person will contact you soon."
+HELP_NOT_ALLOWED = "I can't ask for help for that person."
+HELP_SUMMARY_TOO_LONG = "That's a lot of detail. Could you say it more briefly?"
 
 # Safety guardrails (§6.7)
 EMERGENCY_DETECTED = "This sounds like an emergency. Please call 911 now."

@@ -1,5 +1,6 @@
 """PB-02: create appointment reminders when an appointment is booked; cancel them when it
-is cancelled (Observer, plan §4, §8 PB-02). The appointment code never calls this directly.
+is cancelled; both when it is rescheduled (Observer, plan §4, §8 PB-02). The appointment
+code never calls this directly.
 
 Reminder times are worked out on the user's LOCAL clock with zoneinfo and stored in UTC
 (plan §6.5). "The day before at the same time" is a local wall-clock time, so it stays
@@ -14,7 +15,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.model.entities import Appointment, AppointmentReminder, User
-from app.model.events import AppointmentBooked, AppointmentCancelled
+from app.model.events import AppointmentBooked, AppointmentCancelled, AppointmentRescheduled
 
 MORNING_OF = time(8, 0)  # local time on the day of the appointment
 
@@ -77,3 +78,9 @@ def on_appointment_cancelled(session: Session, event: AppointmentCancelled) -> N
         )
         .values(status="cancelled")
     )
+
+
+def on_appointment_rescheduled(session: Session, event: AppointmentRescheduled) -> None:
+    """Moving an appointment: the old time's reminders stop, the new time gets its own."""
+    on_appointment_cancelled(session, AppointmentCancelled(event.old_appointment_id, event.user_id))
+    on_appointment_booked(session, AppointmentBooked(event.new_appointment_id, event.user_id))

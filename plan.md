@@ -524,6 +524,17 @@ User: "I need a doctor appointment next Tuesday."
   → spoken confirmation: date, time, provider, location
 ```
 Also: list upcoming, cancel, reschedule (each needs confirmation).
+
+**Cancel and reschedule built (Sprint 4, S4-13):** two more commands on the same pipeline.
+`cancel_appointment` (payload `appointment_id`) and `reschedule_appointment` (payload
+`appointment_id` + a `slot_id` from `GET /slots`, same doctor only; another doctor is a
+cancel plus a new booking). Both work only on the user's own appointment that is still
+`booked` and hasn't started (someone else's looks the same as a missing one). Cancel marks
+the row `cancelled`, publishes `AppointmentCancelled`, then cancels at the office last, so
+an office failure rolls everything back. Reschedule reuses the booking slot checks, books
+the new time (a new `appointments` row, so the old one stays as history), marks the old
+row `cancelled`, publishes `AppointmentRescheduled`, then releases the old office booking;
+if any step fails, the new office booking is given back and nothing changes.
 **Edge cases:** slot taken before confirmation, no availability (offer next week or the office phone number), ambiguous doctor name.
 **Acceptance criteria:**
 - user can request an appointment by voice or text;
@@ -534,7 +545,7 @@ Also: list upcoming, cancel, reschedule (each needs confirmation).
 
 ### PB-02 Appointment reminders
 - A `reminder_scheduler` subscriber listens for `AppointmentBooked` and creates reminder rows (default: day before, morning of, 1 hour before; user-configurable).
-- It listens for `AppointmentCancelled` / `AppointmentRescheduled` and cancels or moves the rows. The appointment service never calls reminder code directly (Observer, §4).
+- It listens for `AppointmentCancelled` / `AppointmentRescheduled` and cancels or moves the rows (built: a rescheduled appointment's old reminders are cancelled and the new appointment gets its own, S4-13). The appointment service never calls reminder code directly (Observer, §4).
 
 **Acceptance criteria:**
 - a saved appointment can have a reminder; timing can be configured;
@@ -554,6 +565,22 @@ Also: list upcoming, cancel, reschedule (each needs confirmation).
 ### PB-04 Prescription refill assistance
 - "I'm almost out of my blood pressure pill" → match against the user's active prescriptions (fuzzy match; confirm which one if unclear) → pending action → submit to mock pharmacy → track status (`requested → in_progress → ready`) → spoken update.
 - **Edge cases:** no refills remaining (tell them to contact the doctor; offer PB-07), unknown medication.
+
+**Built (Sprint 4, S4-11):** a `RequestRefill` command (`request_refill`, `reversible = False`).
+The payload names the older adult and either a `medication_id` or a `medication_name` with
+what the user said; the name is matched against their active medications, by medicine
+name first and then by its instructions ("blood pressure pill" → Lisinopril, "For blood
+pressure"). Several matches are refused with "Which one do you mean: …?", never guessed.
+It also refuses: no consent (the older adult themself or `medications:manage`), a stopped
+or unknown medicine, no refills left (points to the doctor and offers PB-07), and a refill
+already open for that medicine (one open request per medication, enforced by a partial
+unique index). On confirm it locks the medication row, uses one refill, saves a
+`refill_requests` row, and submits it to the mock pharmacy (`app/adapters/pharmacy/`);
+if the pharmacy is down, the savepoint rolls everything back and nothing changes.
+`GET /older-adults/{id}/refills` (`medications:read`) asks the pharmacy for progress
+(`requested → in_progress → ready`, only ever forward) and returns each request with a
+sentence to speak. The mock pharmacy is in-memory, like the mock office: after a restart
+the last saved status is kept. Not built: a notification when a refill becomes ready.
 
 **Acceptance criteria:**
 - user can request a refill; system identifies the medication;
@@ -575,6 +602,22 @@ Also: list upcoming, cancel, reschedule (each needs confirmation).
 - Triggered by the user ("I want to talk to a person") or by the fallback rule (§7).
 - Creates a human assistance request with a short, consented summary of what the user was trying to do (not the full transcript).
 - For the prototype, the handoff is **simulated or routed to a predefined contact**, not a production call center: a seeded `support_agent` user with a minimal queue endpoint, plus the option to call the caregiver/emergency contact. **Decide the exact behavior** (§22).
+
+**Built (Sprint 4, S4-12): the simple version** from the §17 cut order (a help request in a
+support queue; no live call or chat). A `RequestHelp` command (`request_help`,
+`reversible = False`) takes the older adult, an optional short `summary` (at most 300
+characters, read back before saving so the user agrees to share it, never the transcript)
+and a `reason` (`user_request` or `repeated_failures`). It refuses emergency wording with
+the 911 message (§6.7: a queue is too slow for an emergency), requests without consent
+(the older adult themself or `profile:manage`), and a second request while one is still
+unresolved (partial unique index). After a yes it saves an `open` row and says what
+happens next: *"A support person will contact you soon. If this is an emergency, call 911
+now."* Support agents (and admins; everyone else gets 403) use `GET /assistance/queue`
+(unresolved, oldest first) and `PATCH /assistance/{id}` to take a request (`in_progress`,
+assigned to them; a second agent gets 409) or close it (`resolved`). Not built: offering
+help automatically after repeated recognition failures (the conversation controller can
+propose `request_help` with `reason: "repeated_failures"`), calling the caregiver, and
+showing the older adult's phone number (the contacts table doesn't exist yet).
 
 **Acceptance criteria:**
 - user can request help; repeated recognition failures offer human assistance;
@@ -646,9 +689,9 @@ First tables built (Sprint 2, for PB-01 and PB-02): `providers`, `appointments`,
 | `medications` | user_id, name, dosage, instructions, refills_remaining (≥ 0), stopped_at | Medication. `pharmacy_contact_id` comes later with the contacts table (PB-04). `stopped_at` set = no new doses. |
 | `medication_schedules` | medication_id, time_of_day (local, no zone), days_of_week (smallint[], 0 = Mon … 6 = Sun) | Local times; the zone is `users.timezone`. At least one day; one row per medication + time. |
 | `medication_reminders` | schedule_id, user_id, due_at (UTC), status (§6.3), attempts, sent_at, confirmed_at | MedicationReminder: one row per real dose, created 7 days ahead (`medication_days_ahead`). Unique (schedule_id, due_at), so doses are never duplicated. `confirmed_at` only for `taken`/`missed`. Polled by worker (partial indexes on `scheduled` and `sent`). |
-| `refill_requests` | user_id, medication_id, status, external_ref | RefillRequest |
+| `refill_requests` | user_id, requested_by, medication_id, status (`requested`/`in_progress`/`ready`), external_ref | RefillRequest. **Built (S4-11).** One open request per medication: unique `medication_id WHERE status IN ('requested', 'in_progress')`. |
 | `messages` | sender_id, older_adult_id, provider_id, body, status (`sent`/`failed`), external_ref | CareMessage. **Built (Sprint 3, PB-07): send only** — no `direction`, `read_at`, or threads (replies deferred, §17 cut order). A `SendCareMessage` command (reversible = False) sends through the mock messaging adapter and saves this row; the emergency guardrail (§6.7) refuses before sending. |
-| `assistance_requests` | user_id, reason, summary, status, assigned_to | HumanAssistanceRequest |
+| `assistance_requests` | user_id, requested_by, reason (`user_request`/`repeated_failures`), summary (≤ 300 chars), status (`open`/`in_progress`/`resolved`), assigned_to, resolved_at | HumanAssistanceRequest. **Built (S4-12).** One unresolved request per older adult: unique `user_id WHERE status IN ('open', 'in_progress')`. |
 | `pending_actions` | user_id, action_type, payload (jsonb), summary_text, status, idempotency_key (unique), expires_at, result (jsonb) | §5.3. **One proposed action per user:** unique `user_id WHERE status = 'proposed'`. |
 | `conversations` / `conversation_turns` | user_id, language / role, text, created_at | Short retention |
 | `notifications` | user_id, kind, payload, delivered_at, acknowledged_at | |
@@ -668,12 +711,12 @@ All under `/api/v1`. All except auth and health require a valid access token. Ex
 | Consent | `GET /consents` · `DELETE /consents/{id}` · *(later: `POST /consents` to add another caregiver)* |
 | AI / conversation | `POST /ai/process` (text in → reply, optional pending action) · `POST /ai/voice` (audio in → transcript, reply text, reply audio, optional pending action) · `POST /ai/tts` |
 | Actions (confirmation) | `POST /actions` (propose only, for the frontend and manual tests without the AI; never executes) · `GET /actions/pending` · `POST /actions/{id}/confirm` · `POST /actions/{id}/cancel` · `POST /actions/{id}/undo` |
-| Appointments | `GET /providers` · `GET /slots?provider_id&from&to` · `GET /appointments` · `GET /appointments/{id}` · *(create/cancel/reschedule via actions)* |
+| Appointments | `GET /providers` · `GET /slots?provider_id&from&to` · `GET /appointments` · `GET /appointments/{id}` · *(create/cancel/reschedule via actions: `book_appointment`, `cancel_appointment`, `reschedule_appointment`)* |
 | Appointment reminders | `POST /appointment-reminders/{id}/acknowledge` (OK button) · `GET /appointment-reminders` · `PATCH /appointment-reminders/settings` |
 | Medications | `GET /older-adults/{id}/medications` (`medications:read`) · `POST /older-adults/{id}/medications` (`medications:manage`; creates doses right away) · `GET /older-adults/{id}/medication-reminders?date=` (`medications:read`; local date, default today) · `POST /medication-reminders/{id}/taken` · `POST /medication-reminders/{id}/missed` (taken/missed: only the older adult; 409 `too_early` more than 1 h before the dose). Paths include the older adult's id so caregivers use the same endpoints under the consent rules (§5.2). |
-| Refills | `GET /refills` · *(create via actions)* |
+| Refills | `GET /older-adults/{id}/refills` (`medications:read`; statuses refreshed from the pharmacy) · *(request via actions: `request_refill`)* |
 | Messages | `GET /older-adults/{id}/messages` (`profile:manage`; send only, newest first) · *(send via actions)* |
-| Assistance (handoff) | `POST /assistance` · `GET /assistance/queue` (agent) · `PATCH /assistance/{id}` (agent) |
+| Assistance (handoff) | `GET /assistance/queue` (support agent/admin; unresolved, oldest first) · `PATCH /assistance/{id}` (agent; `{"status": "in_progress" \| "resolved"}`) · *(ask for help via actions: `request_help`)* |
 | Notifications | `GET /notifications` (polled every 15–30 s; reminders of every kind due in the last 12 hours, with current status) |
 
 Two rules:
