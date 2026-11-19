@@ -638,6 +638,43 @@ footer {
   border: 1px solid #dce5de;
   border-radius: 8px;
 }
+.message-form { display: grid; align-items: start; }
+.message-form textarea {
+  width: 100%; min-width: 0; resize: vertical; padding: 12px;
+  border: 1px solid #abbdb0; border-radius: 6px; background: white; color: #233730;
+}
+.care-message-text, .confirmation h3 { white-space: pre-wrap; overflow-wrap: anywhere; }
+.message-failed { color: #922e26; font-weight: 600; }
+.message-history .section-heading { flex-wrap: wrap; }
+.service-notice {
+  border-left: 4px solid #b48020;
+  background: #fff5dc;
+  padding: 14px 16px;
+  border-radius: 4px;
+}
+.suggestion-card {
+  padding: 16px;
+  margin: 16px 0;
+  border: 1px solid #cbd8cf;
+  border-radius: 8px;
+  background: #f1f6f2;
+}
+.suggestion-card p { margin-bottom: 12px; }
+.suggestion-card button { max-width: 100%; white-space: normal; }
+.request-history { margin-top: 28px; }
+.request-history h4, .request-detail h4 { font-size: 1.1em; margin-bottom: 12px; }
+.request-status { font-weight: 600; color: #286449; }
+.queue-filter { display: grid; gap: 8px; min-width: 0; }
+.care-form input, .care-form select { font: inherit; }
+.care-panel > .button-row > button[aria-expanded="true"] {
+  background: #e3f0e7;
+  border-color: #286449;
+}
+.queue-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.request-detail { margin-top: 16px; padding: 20px; background: #f1f6f2; border: 1px solid #cbd8cf; border-radius: 8px; }
+.request-detail, .queue-layout li { min-width: 0; overflow-wrap: anywhere; }
+.queue-layout button { max-width: 100%; white-space: normal; }
+@media (max-width: 760px) { .queue-layout { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 600px) {
   .care-panel {
     padding: 18px;

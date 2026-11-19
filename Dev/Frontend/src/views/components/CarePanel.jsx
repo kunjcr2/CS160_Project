@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { errorMessage } from "../../models/api.js";
-import { localDate, addDays } from "../../models/dates.js";
-import { formatWhen } from "../../models/reminders.js";
+import { localDate } from "../../models/dates.js";
 import ReminderBanner from "./ReminderBanner.jsx";
+import MessageDoctor from "./MessageDoctor.jsx";
+import { HelpRequest, RefillRequests } from "./CareRequests.jsx";
+import SupportQueue from "./SupportQueue.jsx";
+import Appointments from "./Appointments.jsx";
 
 export default function CarePanel({
   api,
@@ -14,7 +17,50 @@ export default function CarePanel({
   tab,
   setTab,
   panelRef,
+  careIntent,
 }) {
+  const [messageDraft, setMessageDraft] = useState({ providerId: "", body: "" });
+  const messageAttempt = useRef(null);
+  const [helpDraft, setHelpDraft] = useState("");
+  const helpAttempt = useRef(null);
+  const [helpReceipt, setHelpReceipt] = useState(null);
+  const [helpReason, setHelpReason] = useState("user_request");
+  const canMessage = !user || user.role === "older_adult";
+  useEffect(() => {
+    const outcome = conversation.lastResolution;
+    if (outcome?.status === "executed" && ["book_appointment", "cancel_appointment", "reschedule_appointment"].includes(outcome.actionType))
+      onReminderChange();
+  }, [conversation.lastResolution, onReminderChange]);
+  useEffect(() => {
+    if (careIntent?.kind !== "human_help") return;
+    setHelpReason(careIntent.reason === "repeated_failures" ? "repeated_failures" : "user_request");
+    if (typeof careIntent.summary === "string") setHelpDraft((value) => value || careIntent.summary.slice(0, 300));
+  }, [careIntent]);
+  useEffect(() => {
+    const outcome = conversation.lastResolution;
+    if (outcome?.actionType === "request_help" && outcome.status === "executed") setHelpReceipt(outcome);
+    const attempt = helpAttempt.current;
+    if (!outcome || !attempt || outcome.id !== attempt.id) return;
+    if (outcome.status === "executed") setHelpDraft((value) => value.trim() === attempt.summary ? "" : value);
+    helpAttempt.current = null;
+  }, [conversation.lastResolution]);
+  useEffect(() => {
+    const outcome = conversation.lastResolution;
+    const attempt = messageAttempt.current;
+    if (!outcome || !attempt || outcome.id !== attempt.id) return;
+    if (outcome.status === "executed") {
+      setMessageDraft((draft) => draft.body === attempt.body && draft.providerId === attempt.providerId
+        ? { ...draft, body: "" } : draft);
+    }
+    messageAttempt.current = null;
+  }, [conversation.lastResolution]);
+
+  async function proposeMessage(providerId, body) {
+    const action = await conversation.proposeCareMessage(user?.id || "demo", providerId, body);
+    if (action) messageAttempt.current = { id: action.id, providerId, body };
+    return action;
+  }
+
   return (
     <section
       ref={panelRef}
@@ -40,6 +86,16 @@ export default function CarePanel({
             My medications
           </button>
         )}
+        {canMessage && <button className="secondary" aria-expanded={tab === "messages"}
+          onClick={() => setTab(tab === "messages" ? "" : "messages")}>Message my doctor</button>}
+        {canMessage && <>
+          <button className="secondary" aria-expanded={tab === "refills"}
+            onClick={() => setTab(tab === "refills" ? "" : "refills")}>Prescription refills</button>
+          <button className="secondary" aria-expanded={tab === "help"}
+            onClick={() => { setHelpReason("user_request"); setTab(tab === "help" ? "" : "help"); }}>Help</button>
+        </>}
+        {api.mode === "demo" && <button className="secondary" aria-expanded={tab === "support"}
+          onClick={() => setTab(tab === "support" ? "" : "support")}>Preview support queue</button>}
       </div>
       {tab === "appointments" && (
         <Appointments
@@ -47,6 +103,8 @@ export default function CarePanel({
           timeZone={timeZone}
           disabled={disabled}
           onPropose={conversation.proposeAppointment}
+          onCancel={conversation.proposeCancellation}
+          onReschedule={conversation.proposeReschedule}
           revision={conversation.careRevision}
         />
       )}
@@ -58,197 +116,28 @@ export default function CarePanel({
           onReminderChange={onReminderChange}
         />
       )}
+      {tab === "messages" && canMessage && <MessageDoctor api={api} olderAdultId={user?.id || "demo"}
+        timeZone={timeZone} disabled={disabled} draft={messageDraft} setDraft={setMessageDraft}
+        onPropose={proposeMessage} revision={conversation.careRevision} proposalError={conversation.error} />}
+      {tab === "help" && canMessage && <HelpRequest api={api} userId={user?.id || "demo"}
+        timeZone={timeZone} disabled={disabled} draft={helpDraft} setDraft={setHelpDraft}
+        revision={conversation.careRevision} proposalError={conversation.error}
+        receipt={helpReceipt}
+        onPropose={async (summary) => {
+          const action = await conversation.proposeHumanHelp(user?.id || "demo", summary, helpReason);
+          if (action) helpAttempt.current = { id: action.id, summary };
+        }} />}
+      {tab === "refills" && canMessage && <RefillRequests api={api} userId={user?.id || "demo"}
+        timeZone={timeZone} disabled={disabled} revision={conversation.careRevision}
+        proposalError={conversation.error} onPropose={(id) => conversation.proposeRefill(user?.id || "demo", id)}
+        onMessageDoctor={(medication) => {
+          setMessageDraft((value) => value.body.trim() ? value : {
+            ...value, body: medication ? `I have a question about refilling ${medication.name}, ${medication.dosage}. Could you help me with the next step?` : "",
+          });
+          setTab("messages");
+        }} />}
+      {tab === "support" && api.mode === "demo" && <SupportQueue api={api} timeZone={timeZone} />}
     </section>
-  );
-}
-
-function Appointments({ api, timeZone, disabled, onPropose, revision }) {
-  const [providers, setProviders] = useState([]);
-  const [appointments, setAppointments] = useState([]);
-  const [providerId, setProviderId] = useState("");
-  const [from, setFrom] = useState(() => localDate(timeZone));
-  const [to, setTo] = useState(() => addDays(localDate(timeZone), 7));
-  const [slots, setSlots] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [searching, setSearching] = useState(false);
-  const [error, setError] = useState("");
-  const [reload, setReload] = useState(0);
-  const search = useRef(null);
-  useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true);
-    setError("");
-    setSlots(null);
-    Promise.all([
-      api.listProviders(controller.signal),
-      api.listAppointments(controller.signal),
-    ])
-      .then(([doctors, visits]) => {
-        if (controller.signal.aborted) return;
-        setProviders(doctors);
-        setAppointments(visits);
-        setProviderId((id) =>
-          doctors.some((doctor) => doctor.id === id)
-            ? id
-            : doctors[0]?.id || "",
-        );
-      })
-      .catch((error) => {
-        if (!controller.signal.aborted) setError(errorMessage(error));
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-    return () => {
-      controller.abort();
-      search.current?.abort();
-    };
-  }, [api, revision, reload]);
-  function clearSlots() {
-    search.current?.abort();
-    setSearching(false);
-    setSlots(null);
-  }
-  async function find(event) {
-    event.preventDefault();
-    search.current?.abort();
-    const controller = new AbortController();
-    search.current = controller;
-    setSlots(null);
-    setError("");
-    if (!from || !to || to < from || to > addDays(from, 31)) {
-      setError("Choose an end date within 31 days of the start date.");
-      return;
-    }
-    setSearching(true);
-    try {
-      const result = await api.listSlots(
-        providerId,
-        from,
-        to,
-        controller.signal,
-      );
-      if (!controller.signal.aborted) setSlots(result);
-    } catch (error) {
-      if (!controller.signal.aborted) setError(errorMessage(error));
-    } finally {
-      if (!controller.signal.aborted) setSearching(false);
-    }
-  }
-  return (
-    <div className="care-content">
-      <h3>Choose an appointment</h3>
-      <p>
-        Choose a time, then review and confirm it in the conversation. Selecting
-        a time does not book it.
-      </p>
-      <p className="quiet-label">Times shown in {timeZone}.</p>
-      {loading && <p role="status">Loading appointments...</p>}
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
-      <button
-        className="secondary"
-        disabled={loading || disabled}
-        onClick={() => setReload((n) => n + 1)}
-      >
-        Refresh appointments
-      </button>
-      <form className="care-form" onSubmit={find}>
-        <label>
-          Doctor
-          <select
-            value={providerId}
-            disabled={loading || disabled}
-            onChange={(event) => {
-              clearSlots();
-              setProviderId(event.target.value);
-            }}
-          >
-            {!providers.length && (
-              <option value="">No doctors available</option>
-            )}
-            {providers.map((provider) => (
-              <option key={provider.id} value={provider.id}>
-                {provider.name} — {provider.specialty}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          From date
-          <input
-            type="date"
-            value={from}
-            required
-            disabled={disabled}
-            onChange={(event) => {
-              clearSlots();
-              setFrom(event.target.value);
-            }}
-          />
-        </label>
-        <label>
-          Through date
-          <input
-            type="date"
-            value={to}
-            required
-            disabled={disabled}
-            onChange={(event) => {
-              clearSlots();
-              setTo(event.target.value);
-            }}
-          />
-        </label>
-        <button
-          className="primary"
-          disabled={loading || searching || disabled || !providerId}
-        >
-          Find times
-        </button>
-      </form>
-      {searching && <p role="status">Finding available times...</p>}
-      {slots?.length === 0 && (
-        <p role="status">
-          No available times. Try another doctor or date range.
-        </p>
-      )}
-      <ul className="care-list">
-        {slots?.map((slot) => (
-          <li key={slot.slot_id}>
-            <strong>{slot.provider.name}</strong>
-            <p>{formatWhen(slot.starts_at, timeZone)}</p>
-            <button
-              className="secondary"
-              disabled={disabled}
-              onClick={async () => {
-                if (await onPropose(slot)) setSlots(null);
-              }}
-            >
-              Review this time
-            </button>
-          </li>
-        ))}
-      </ul>
-      <h3>Upcoming appointments</h3>
-      {!loading && !error && !appointments.length && (
-        <p>No upcoming appointments.</p>
-      )}
-      <ul className="care-list">
-        {appointments.map((visit) => (
-          <li key={visit.id}>
-            <strong>{visit.provider.name}</strong>
-            <p>{formatWhen(visit.starts_at, timeZone)}</p>
-            <p>
-              {visit.location} · {visit.status}
-            </p>
-          </li>
-        ))}
-      </ul>
-    </div>
   );
 }
 

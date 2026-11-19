@@ -1,32 +1,30 @@
 # Care Companion Frontend
 
-React/Vite conversation, confirmations, reminders, and the first Sprint 3 voice UI.
+React/Vite care screens with authenticated API adapters, explicit confirmations,
+medication reminders, turn-based voice, care messages, refills and support requests.
 
-## Status (November 14, 2026)
+## Status (November 19, 2026)
 
 | Area | Implemented locally | Remaining acceptance work |
 | --- | --- | --- |
-| S2-15 | Conversation UI; provider/slot search; explicit proposal and confirmation; pending-action recovery | AI intent-to-persisted-action integration and PostgreSQL acceptance |
+| S2-15 / appointments | Conversation; provider/slot search; booking, cancellation and same-doctor rescheduling; confirmation and pending-action recovery | Integrated PostgreSQL acceptance |
 | S2-16 | Notification polling; appointment OK; medication Taken/Missed; medication schedules and daily doses; profile timezone and role checks | Medication feed/worker patch review and real worker tests |
 | S2-17 | Exact direct dependency versions, lockfile, setup README | Review and merge |
 | Sprint 3 voice | Microphone capture, transcription review, reply playback, opt-in automatic reading, cancellation and text fallback | Test with real microphone, actual STT/TTS, and integrated backend |
-| Auth integration | Pairing/email sign-in; single-flight refresh; cross-tab cookie lock; stale-session protection | Real auth API acceptance after PR #17/#18 merge |
-| Sprint 3 remaining screens | Not implemented | Confirm Help, support queue, care messages and refill API contracts and team assignments |
+| Auth integration | Pairing/email sign-in; single-flight refresh; cross-tab cookie lock; stale-session protection | Real PostgreSQL auth acceptance |
+| PB-07 care messages | Doctor selection, text draft, explicit review/confirm, sent/failed history against PR #34 | Acceptance against PR #34 with PostgreSQL; voice proposals remain deferred |
+| PB-06 Help and support queue | PR #38 Help proposals/confirmation; submitted receipt; agent/admin queue, claim/resolve, conflict handling and polling | Real API acceptance; older-adult Help history is not provided by this backend |
+| PB-04 refills | PR #38 proposals, confirmation and history; status polling; remaining-count refresh; doctor-message fallback | Real API and simulated-pharmacy acceptance |
+| AI suggestions | PR #31 intent routing to care forms and repeated-failure Help offer; explicit review before actions | Actual OpenAI recognition quality; care-message voice intent is not exposed yet |
 
-This implements the frontend against the reviewed PR code. An isolated local
-integration checkout combines the backend PRs; no remote PRs were merged and
-no existing databases were migrated. This is not a claim of live end-to-end acceptance.
-Remote main now includes PR #5 (AI conversation and speech) and PR #16 (the real
-users table and first migration), in addition to the health endpoint.
-Auth, actions, and notifications are still in open PRs, so main
-alone cannot run this frontend's full live workflow. The local frontend branch
-has been merged with that main locally; the Python cache/virtualenv ignore rules
-from both branches were preserved. This branch includes the auth, reminder, and
-voice frontend updates for PR #20. A separate local `integration/frontend-pr-apis`
-branch includes PR #15, whose latest head already incorporates #11–#14 and
-#17–#19/#21. Shared Bearer authentication is present there. See
-[the integration notes](PR_API_INTEGRATION.md) for pinned revisions and setup.
-Sprint 3 is not complete.
+The frontend now targets PR #38 (`44e9ae3`) for Help, queue, refills and appointment
+changes, PR #34 for messages, and merged PR #31 for AI suggestions. The inspected
+remote main is `14c055c`; PR #38 is still open. Run a backend containing those
+contracts, not the old backend in this primary local checkout. The sibling
+`integration/frontend-pr-apis` checkout is also an older snapshot and has not been
+updated by this frontend change. See [integration notes](PR_API_INTEGRATION.md).
+No remote PRs were merged and no existing databases were migrated. This is not a
+claim of real backend end-to-end acceptance or completion of the whole team sprint.
 
 ## Run Locally
 
@@ -86,6 +84,8 @@ Sources: [PR #5](https://github.com/kunjcr2/CS160_Project/pull/5),
 [PR #17](https://github.com/kunjcr2/CS160_Project/pull/17),
 [PR #18](https://github.com/kunjcr2/CS160_Project/pull/18),
 [PR #21](https://github.com/kunjcr2/CS160_Project/pull/21).
+Care-message contracts were checked separately against
+[PR #34](https://github.com/kunjcr2/CS160_Project/pull/34), head `01fc2e7`.
 
 All routes below use /api/v1.
 
@@ -104,6 +104,8 @@ All routes below use /api/v1.
 | GET /providers; GET /slots?provider_id&from&to&limit | Search available times in a date range of at most 31 days |
 | POST /actions | Propose book_appointment with the exact returned slot_id; never auto-confirm |
 | GET /appointments | List upcoming appointments; refresh after confirmation |
+| POST /actions with action_type=send_care_message | Payload {older_adult_id, provider_id, body}; show returned confirmation card before sending |
+| GET /older-adults/{id}/messages | Provider, body, sent/failed status and created_at; newest first |
 | GET /older-adults/{id}/medications | Show prescribed medications and local schedules |
 | GET /older-adults/{id}/medication-reminders?date=YYYY-MM-DD | Show the selected date's doses; default date uses the profile timezone |
 | GET /notifications | Flat notification array; id is reminder ID |
@@ -183,7 +185,7 @@ The isolated integration branch registers PR #21's medication source in PR #13's
 feed and worker. These backend patches still need teammate review. The older-adult
 medication list and daily-dose screens use PR #21 directly, including status updates
 every 20 seconds while open. A failed refresh disables stale dose buttons until a
-successful refresh. Adding medications, caregiver patient selection, Help, messaging,
+successful refresh. Adding medications, caregiver patient selection, Help,
 support queues and refill requests are not implemented. Shared Bearer authentication
 is already in the combined backend PR head. Do not mark this as live-tested based
 on frontend mocks.
@@ -198,9 +200,94 @@ converted into an invented slot. Pending confirmations are restored on sign-in o
 page reload. A failed pending lookup blocks new requests until retry succeeds;
 a lost proposal response triggers recovery instead of blindly replacing the action.
 
+## Message My Doctor (PB-07)
+
+Open **My care → Message my doctor**, choose a doctor, and type up to 2,000
+characters. **Review message** creates `send_care_message` using the signed-in
+older adult's ID, the selected provider's ID and the trimmed body. The server's
+summary is displayed in a **REVIEW MESSAGE** card. Only **Confirm** calls the
+confirm endpoint; Cancel never sends. A successful send refreshes history and
+clears the submitted draft; cancellation and failure retain it. Drafts survive
+panel changes in memory, but are not saved to browser storage or across sign-out.
+
+PR #34's messaging provider is a mock: even live API mode does not deliver to a
+real doctor. The screen labels this explicitly. The history endpoint includes
+both sent and failed records. There are no replies or read receipts.
+
+An executed action is not enough to report success: PR #34 can return
+`action.status="executed"` with `action.result.ok=false` when delivery fails.
+The adapter checks `ok` and `message_id`, preserves backend errors/guardrail
+messages, and refreshes history after a terminal failure. Retrying a lost confirm
+response uses the same action ID; it never automatically creates a second message.
+Saved pending messages are restored after a page reload, including their full
+server read-back. New proposals stay blocked until the pending action is resolved.
+
+This first screen is for the signed-in older adult (plus explicit demo mode).
+Caregiver patient selection is not implemented; a caregiver ID is never substituted
+for older_adult_id. AI/voice care-message proposals remain deferred. To use the
+real API, run a backend containing PR #34 and its migration; the older local
+integration checkout does not contain #34 yet. A 404 does not fall back to samples.
+
+## Help, support queue and prescription refills
+
+Open **My care → Help**, **Prescription refills**, or **Preview support queue**
+in demo mode. The queue preview is explicitly a simulation. A signed-in
+`support_agent` or `admin` instead gets a separate support workspace; the app does not load
+older-adult conversations, pending actions or notifications for that role.
+
+- Help shares only the optional summary (maximum 300 characters) the user reviews and confirms, not the
+  conversation transcript. Cancellation retains the draft and creates no request.
+- The demo queue starts with one sample request. Create a Help request, then
+  preview the queue, view its details, take it, and mark it resolved. Return to
+  Help to see the updated status. Queue failures require a refresh before retry.
+- Refill selection shows available counts, blocks zero/unknown counts and stopped
+  medications, and offers **Contact my doctor**. This opens an editable message
+  draft; it never sends automatically or overwrites an existing message draft.
+- A confirmed demo refill is only **Submitted for review**. It does not mean a
+  pharmacy received or approved it. Duplicate pending requests are blocked.
+- Demo requests live in memory and reset on reload. Nothing is sent to a real
+  agent, doctor or pharmacy. Existing confirmation, cancellation and expiry checks
+  apply, and inputs/queue controls support a 320px viewport and larger text.
+
+In live mode, `src/models/requestApi.js` implements the verified PR #38 contracts:
+
+| Operation | API (all prefixed with /api/v1) |
+| --- | --- |
+| Help proposal | `POST /actions`, type `request_help`, payload `{older_adult_id, summary, reason}` |
+| Refill proposal | `POST /actions`, type `request_refill`, payload `{older_adult_id, medication_id}` |
+| Confirm / reject proposal | `POST /actions/{id}/confirm` / `/cancel` |
+| Refill history | `GET /older-adults/{id}/refills` |
+| Unresolved support queue | `GET /assistance/queue` |
+| Claim / resolve | `PATCH /assistance/{id}`, body `{status: "in_progress"}` or `{status: "resolved"}` |
+| Cancel appointment proposal | `POST /actions`, type `cancel_appointment`, payload `{appointment_id}` |
+| Reschedule proposal | `POST /actions`, type `reschedule_appointment`, payload `{appointment_id, slot_id}` |
+
+Refill statuses are `requested`, `in_progress`, `ready`; the backend's status
+sentence is displayed. Medication counts reload after confirmation. Refill history
+and the unresolved support queue poll every 20 seconds while visible, with manual
+refresh and focus refresh. Queue status starts at `open`; claiming conflicts require
+a refresh. Resolved rows disappear from the live queue; there is no live archive.
+
+PR #38 does not expose an older-adult Help history/detail endpoint. Live Help shows
+only a verified submission receipt for this session, with a clear progress/history
+limitation. It never reads the agent-only queue using an older-adult account.
+Caregiver patient management is outside the implemented older-adult workflow.
+
+Appointment changes are available only for future booked visits. Rescheduling locks
+the original doctor and uses the opaque slot ID from the server. Creating a proposal
+does not change the visit; confirm refreshes appointments and reminders. A failed
+office call leaves the original visit intact. AI/voice intents open the matching
+care form for explicit selection and review; they never invent persisted action IDs.
+Repeated unclear replies carry `unclear_turns` back to the AI and offer Help when
+`offer_human_help` is true. This does not automatically send a transcript or request.
+
+All failures stay in live mode: no sample fallback or fabricated success. These API
+contracts still use a simulated pharmacy/provider. Real pharmacy or doctor delivery
+is not claimed.
+
 ## Verification
 
-November 14 local results: 29 unit tests passed, 33 Chrome offline browser tests
+November 19 local results: 47 unit tests passed, 66 Chrome offline browser tests
 passed, and the production build passed. The normal dev-server browser run was
 blocked by this environment (Edge launch failure; Chrome localhost network
 access denied). Real backend and microphone acceptance remain pending.

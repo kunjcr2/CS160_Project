@@ -15,9 +15,12 @@ export function useConversation(api) {
   const [failedText, setFailedText] = useState("");
   const locked = useRef(false);
   const conversationId = useRef(null);
+  const unclearTurns = useRef(0);
+  const [suggestion, setSuggestion] = useState(null);
   const [pendingReady, setPendingReady] = useState(false);
   const [pendingError, setPendingError] = useState("");
   const [careRevision, setCareRevision] = useState(0);
+  const [lastResolution, setLastResolution] = useState(null);
   const mounted = useRef(false);
   const restoreVersion = useRef(0);
   const restorePending = useCallback(async () => {
@@ -55,9 +58,13 @@ export function useConversation(api) {
     setBusy("thinking");
     setError("");
     setFailedText("");
+    setSuggestion(null);
     if (!retry) append("user", clean);
     try {
-      const reply = await api.converse(clean, conversationId.current);
+      const reply = await api.converse(clean, conversationId.current, unclearTurns.current);
+      if (!mounted.current) return false;
+      unclearTurns.current = reply.unclearTurns ?? 0;
+      setSuggestion(reply.intent || (reply.offerHumanHelp ? { kind: "human_help", reason: "repeated_failures" } : null));
       append("assistant", reply.text, reply.notice);
       setProposal(reply.proposal);
       conversationId.current = reply.conversation_id ?? conversationId.current;
@@ -71,18 +78,19 @@ export function useConversation(api) {
     return true;
   }
 
-  async function proposeAppointment(slot) {
+  async function propose(createAction) {
     if (locked.current || proposal || !pendingReady) return false;
     locked.current = true;
     setBusy("proposing");
+    setSuggestion(null);
     setError("");
     setFailedText("");
     try {
-      const action = await api.proposeAppointment(slot.slot_id);
+      const action = await createAction();
       if (!mounted.current) return false;
       append("assistant", action.summary);
       setProposal(action);
-      return true;
+      return action;
     } catch (error) {
       if (!mounted.current) return false;
       setError(errorMessage(error));
@@ -96,14 +104,24 @@ export function useConversation(api) {
     }
   }
 
+  function proposeAppointment(slot) {
+    return propose(() => api.proposeAppointment(slot.slot_id));
+  }
+
+  function proposeCareMessage(olderAdultId, providerId, body) {
+    return propose(() => api.proposeCareMessage(olderAdultId, providerId, body));
+  }
+
   async function resolve(decision) {
     if (!proposal || locked.current) return;
     locked.current = true;
     setBusy(decision);
     setError("");
     try {
-      const result = await api.resolveAction(proposal.id, decision);
+      const result = await api.resolveAction(proposal.id, decision, proposal.action_type);
       append("assistant", result.message);
+      setLastResolution({ id: proposal.id, actionType: proposal.action_type, status: result.status,
+        data: result.data, message: result.message });
       setProposal(null);
       setCareRevision((value) => value + 1);
     } catch (error) {
@@ -130,6 +148,14 @@ export function useConversation(api) {
     pendingError,
     restorePending,
     proposeAppointment,
+    proposeCareMessage,
+    proposeHumanHelp: (userId, summary, reason) => propose(() => api.proposeHumanHelp(userId, summary, reason)),
+    proposeRefill: (userId, medicationId) => propose(() => api.proposeRefill(userId, medicationId)),
+    proposeCancellation: (id) => propose(() => api.proposeCancellation(id)),
+    proposeReschedule: (id, slotId) => propose(() => api.proposeReschedule(id, slotId)),
+    suggestion,
+    clearSuggestion: () => setSuggestion(null),
+    lastResolution,
     careRevision,
   };
 }

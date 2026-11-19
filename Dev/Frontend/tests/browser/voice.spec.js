@@ -133,6 +133,7 @@ test("record, transcribe, review, send and play a reply with no false confirmati
     expect(route.request().postDataJSON()).toEqual({
       text: "Book a visit tomorrow.",
       language: "en",
+      unclear_turns: 0,
     });
     return route.fulfill({
       json: {

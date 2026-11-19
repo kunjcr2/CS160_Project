@@ -26,6 +26,7 @@ import ConfirmationCard from "./views/components/ConfirmationCard.jsx";
 import ReminderBanner from "./views/components/ReminderBanner.jsx";
 import SignIn from "./views/components/SignIn.jsx";
 import CarePanel from "./views/components/CarePanel.jsx";
+import { SupportWorkspace } from "./views/components/SupportQueue.jsx";
 import { useVoice, useSpeechPlayback } from "./controllers/useVoice.js";
 
 const mode =
@@ -83,6 +84,8 @@ export default function App() {
         }}
       />
     );
+  if (["support_agent", "admin"].includes(user?.role)) return <SupportWorkspace key={user.id}
+    api={api} user={user} onSignOut={() => setUser(null)} />;
   return (
     <Companion
       key={user?.id || "demo"}
@@ -98,6 +101,7 @@ function Companion({ api, user, onSignOut }) {
   const notifications = useNotifications(api);
   const [draft, setDraft] = useState("");
   const [careTab, setCareTab] = useState("");
+  const [careIntent, setCareIntent] = useState(null);
   const carePanel = useRef(null);
   const [largeText, setLargeText] = useState(false);
   const [demoNotice, setDemoNotice] = useState("");
@@ -168,6 +172,15 @@ function Companion({ api, user, onSignOut }) {
     conversation.send(draft);
     setDraft("");
     input.current?.focus();
+  }
+
+  function openSuggestion() {
+    const intent = conversation.suggestion;
+    if (!intent) return;
+    setCareIntent({ ...intent });
+    setCareTab({ appointment: "appointments", medication_reminder: "medications", refill: "refills", human_help: "help" }[intent.kind]);
+    conversation.clearSuggestion();
+    carePanel.current?.focus();
   }
 
   return (
@@ -330,6 +343,14 @@ function Companion({ api, user, onSignOut }) {
               onResolve={conversation.resolve}
             />
           )}
+          {conversation.suggestion && !conversation.proposal && (!user || user.role === "older_adult") && (
+            <div className="suggestion-card">
+              <p>Review the details before creating a request.</p>
+              <button className="secondary" disabled={occupied} onClick={openSuggestion}>
+                {{ appointment: "Choose an appointment", medication_reminder: "View medication schedule", refill: "Choose a medication to refill", human_help: "Review support options" }[conversation.suggestion.kind]}
+              </button>
+            </div>
+          )}
           {!conversation.pendingReady && (
             <div
               className={conversation.pendingError ? "error" : "quiet-label"}
@@ -413,7 +434,7 @@ function Companion({ api, user, onSignOut }) {
                 onChange={(event) => setDraft(event.target.value)}
                 placeholder={
                   conversation.proposal
-                    ? "Review the appointment above first"
+                    ? "Review the confirmation above first"
                     : "What would you like help with?"
                 }
               />
@@ -594,6 +615,7 @@ function Companion({ api, user, onSignOut }) {
           tab={careTab}
           setTab={setCareTab}
           panelRef={carePanel}
+          careIntent={careIntent}
           user={user}
           timeZone={timeZone}
           disabled={occupied}

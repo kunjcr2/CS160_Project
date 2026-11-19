@@ -1,8 +1,15 @@
-import { useEffect, useState } from "react";
-import { CalendarDays, Check, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { CalendarDays, MessageCircle, Pill, LifeBuoy, Check, X } from "lucide-react";
 import { formatWhen } from "../../models/reminders.js";
 
 export default function ConfirmationCard({ proposal, busy, onResolve }) {
+  const card = useRef(null);
+  const actionType = proposal.action_type ?? proposal.type ?? "book_appointment";
+  const isMessage = actionType === "send_care_message";
+  const isHelp = ["request_help", "demo_request_help"].includes(actionType);
+  const isRefill = ["request_refill", "demo_request_refill"].includes(actionType);
+  const Icon = isMessage ? MessageCircle : isHelp ? LifeBuoy : isRefill ? Pill : CalendarDays;
+  useEffect(() => { card.current?.focus(); }, [proposal.id]);
   const [now, setNow] = useState(Date.now());
   const expires = proposal.expires_at ? Date.parse(proposal.expires_at) : null;
   const expired =
@@ -13,10 +20,10 @@ export default function ConfirmationCard({ proposal, busy, onResolve }) {
   }, [proposal.id]);
   const details = proposal.details ?? {};
   return (
-    <section className="confirmation" aria-labelledby="confirmation-title">
+    <section ref={card} tabIndex={-1} className="confirmation" aria-labelledby="confirmation-title">
       <p className="eyebrow">
-        <CalendarDays size={20} aria-hidden="true" />
-        REVIEW APPOINTMENT
+        <Icon size={20} aria-hidden="true" />
+        {isMessage ? "REVIEW MESSAGE" : isHelp ? "REVIEW HELP REQUEST" : isRefill ? "REVIEW REFILL" : actionType === "cancel_appointment" ? "REVIEW CANCELLATION" : actionType === "reschedule_appointment" ? "REVIEW RESCHEDULE" : actionType === "book_appointment" ? "REVIEW APPOINTMENT" : "REVIEW REQUEST"}
       </p>
       <h3 id="confirmation-title">{proposal.summary}</h3>
       <dl>
@@ -35,7 +42,7 @@ export default function ConfirmationCard({ proposal, busy, onResolve }) {
       </dl>
       {expired && (
         <p role="status">
-          This proposal has expired. Cancel it and request a new appointment.
+          This proposal has expired. Cancel it and start a new request.
         </p>
       )}
       <div className="button-row">

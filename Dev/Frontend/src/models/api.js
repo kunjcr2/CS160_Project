@@ -1,5 +1,7 @@
 import { normalizeNotifications, normalizeReminder } from "./reminders.js";
 import { withAuthLock } from "./authLock.js";
+import { MESSAGE_MAX_LENGTH, normalizeCareMessages } from "./careMessages.js";
+import { createRequestApi } from "./requestApi.js";
 
 export class ApiError extends Error {
   constructor(message, status = 0, code = "") {
@@ -11,7 +13,8 @@ export class ApiError extends Error {
 
 export function errorMessage(error) {
   if (error.code) return error.message;
-  if (error.status === 401 || error.status === 403)
+  if (error.status === 403) return "Your account does not have access to this service.";
+  if (error.status === 401)
     return "Please sign in again before continuing.";
   if (error.status === 404)
     return "This item or service is unavailable. Refresh to check again.";
@@ -30,14 +33,18 @@ export function normalizeReply(payload) {
     );
   let proposal = payload.pending_action ?? payload.proposal ?? null;
   let notice = "";
+  let intent = null;
   // PR #5 returns intent, not a persisted action. Never invent an action ID.
   if (
     !payload.pending_action &&
-    ["appointment", "medication_reminder"].includes(proposal?.kind)
+    ["appointment", "medication_reminder", "refill", "human_help"].includes(proposal?.kind)
   ) {
+    const kind = proposal.kind;
+    intent = { ...proposal };
     proposal = null;
-    notice =
-      "This request is not ready to confirm. No appointment or reminder has been saved.";
+    notice = kind === "refill" || kind === "human_help"
+      ? `Open ${kind === "refill" ? "Prescription refills" : "Help"} in My care to check availability. No request has been submitted.`
+      : "This request is not ready to confirm. No appointment or reminder has been saved.";
   }
   if (proposal) {
     proposal = {
@@ -53,7 +60,10 @@ export function normalizeReply(payload) {
         "The proposal is incomplete. Please ask the assistant to try again.",
       );
   }
-  return { text, proposal, notice, conversation_id: payload.conversation_id };
+  return { text, proposal, notice, intent,
+    offerHumanHelp: payload.offer_human_help === true,
+    unclearTurns: Number.isInteger(payload.unclear_turns) ? Math.max(0, Math.min(3, payload.unclear_turns)) : 0,
+    conversation_id: payload.conversation_id };
 }
 
 export function normalizeAction(action) {
@@ -221,6 +231,7 @@ export function createApi({
 
   return {
     mode: "live",
+    ...createRequestApi(request, normalizeAction),
     async restoreSession() {
       await refreshToken();
       return request("/api/v1/users/me");
@@ -243,11 +254,11 @@ export function createApi({
         sessionVersion++;
       });
     },
-    async converse(text) {
+    async converse(text, _conversationId, unclearTurns = 0) {
       return normalizeReply(
         await request("/api/v1/ai/process", {
           method: "POST",
-          body: { text, language: "en" },
+          body: { text, language: "en", unclear_turns: unclearTurns },
           timeoutMs: 60000,
         }),
       );
@@ -270,6 +281,25 @@ export function createApi({
     },
     async listProviders(signal) {
       return listResponse(await request("/api/v1/providers", { signal }));
+    },
+    async proposeCareMessage(olderAdultId, providerId, body) {
+      const clean = typeof body === "string" ? body.trim() : "";
+      if (!olderAdultId || !providerId || !clean || clean.length > MESSAGE_MAX_LENGTH)
+        throw new ApiError("Choose a doctor and enter a message of 1–2,000 characters.");
+      const action = normalizeAction(await request("/api/v1/actions", {
+        method: "POST",
+        body: { action_type: "send_care_message", payload: {
+          older_adult_id: olderAdultId, provider_id: providerId, body: clean,
+        } },
+      }));
+      if (action.action_type !== "send_care_message")
+        throw new ApiError("We couldn't verify the message proposal. Refresh before continuing.");
+      return action;
+    },
+    async listCareMessages(olderAdultId, signal) {
+      return normalizeCareMessages(await request(
+        `/api/v1/older-adults/${encodeURIComponent(olderAdultId)}/messages`, { signal },
+      ));
     },
     async listSlots(providerId, from, to, signal) {
       const query = new URLSearchParams({
@@ -343,7 +373,7 @@ export function createApi({
         timeoutMs: 90000,
       });
     },
-    async resolveAction(id, decision) {
+    async resolveAction(id, decision, expectedType) {
       if (!["confirm", "cancel"].includes(decision))
         throw new ApiError("Invalid action.");
       const result = await request(
@@ -355,13 +385,28 @@ export function createApi({
           "We couldn't verify the result. Refresh before trying again.",
         );
       const status = result.action.status;
+      if (expectedType && result.action.action_type !== expectedType)
+        throw new ApiError("We couldn't verify the message result. Refresh before trying again.");
       if (status === "failed")
         throw new ApiError(result.message, 409, "action_failed");
       if (status !== (decision === "confirm" ? "executed" : "cancelled"))
         throw new ApiError(
           "We couldn't verify the result. Refresh before trying again.",
         );
-      return { status, message: result.message };
+      // PR #34 records an executed command even when its messaging adapter
+      // reports delivery failure. Execution alone is not evidence of sending.
+      if (decision === "confirm" && result.action.action_type === "send_care_message") {
+        if (result.action.result?.ok === false)
+          throw new ApiError(result.message, 409, "message_delivery_failed");
+        if (result.action.result?.ok !== true || typeof result.action.result?.message_id !== "string" || !result.action.result.message_id)
+          throw new ApiError("We couldn't verify whether the message was sent. Retry this confirmation to check the same request.");
+      }
+      const requiredResult = { request_help: "assistance_request_id", request_refill: "refill_request_id",
+        cancel_appointment: "appointment_id", reschedule_appointment: "appointment_id" }[result.action.action_type];
+      if (decision === "confirm" && requiredResult &&
+          (typeof result.action.result?.[requiredResult] !== "string" || !result.action.result[requiredResult]))
+        throw new ApiError("We couldn't verify the saved request. Retry this confirmation to check the same request.");
+      return { status, message: result.message, data: result.action.result };
     },
     async listNotifications(signal) {
       return normalizeNotifications(
