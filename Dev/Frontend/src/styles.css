@@ -775,3 +775,131 @@ textarea, .care-form input, .care-form select, .sign-in input { border-radius: 1
   .conversation-panel, .today-panel { padding: 20px; }
 }
 @media (prefers-reduced-motion: reduce) { button { transition: none; } }
+
+/* Care Companion visual system */
+:root { color: #18382f; background: #f5f8f4; }
+body { background: #f5f8f4; }
+.app-header {
+  padding-top: 17px; padding-bottom: 17px;
+  border-bottom: 1px solid #e0e9e2;
+  box-shadow: none;
+}
+.brand-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 48px; height: 48px; flex: 0 0 48px;
+  border-radius: 15px; background: #195a46; color: #fff;
+  box-shadow: 0 5px 12px rgba(25, 90, 70, .18);
+}
+.brand h1 { font-size: 21px; letter-spacing: -.025em; }
+.brand p { color: #526b60; }
+.welcome-band {
+  max-width: 1280px; margin: 26px auto 0; padding: 28px 32px;
+  display: flex; justify-content: space-between; align-items: center; gap: 20px;
+  color: #fff; border-radius: 22px;
+  background: linear-gradient(115deg, #164c3d 0%, #246b53 68%, #37856a 100%);
+  box-shadow: 0 12px 28px rgba(23, 73, 54, .13);
+}
+.welcome-kicker { display: flex; align-items: center; gap: 8px; color: #d1eadb; font-size: 13px; font-weight: 700; letter-spacing: .09em; }
+.welcome-band h2 { margin: 6px 0; font-size: clamp(27px, 3vw, 36px); letter-spacing: -.035em; line-height: 1.2; }
+.welcome-band > div > p:last-child { color: #eff9f1; font-size: 17px; }
+.welcome-link { color: #fff; text-decoration: none; border: 1px solid #9dc8b3; border-radius: 12px; padding: 12px 16px; font-weight: 650; white-space: nowrap; }
+.welcome-link:hover { background: rgba(255,255,255,.12); }
+.welcome-link span { margin-left: 8px; }
+.workspace { max-width: 1328px; padding-top: 20px; gap: 20px; }
+.conversation-panel, .today-panel, .care-panel {
+  border: 1px solid #dfe9e1; background: #fff;
+  box-shadow: 0 8px 26px rgba(31, 66, 45, .055);
+}
+.conversation-panel, .today-panel { padding: 28px; }
+.today-panel { background: #f0f6f0; }
+.section-heading h2, .care-panel h2 { color: #173c2e; letter-spacing: -.025em; }
+.eyebrow { color: #3e7356; font-size: 13px; }
+.quiet-label, .timezone-note, .delivery-status { color: #50695b; }
+.messages { min-height: 180px; gap: 16px; }
+.message--assistant { background: #f0f6f1; border: 1px solid #e0ebe2; }
+.message--user { background: #dcefe2; }
+.speaker { color: #426451; }
+.quick-prompts { margin: 16px 0 18px; }
+.quick-prompts button { font-size: 16px; border-radius: 999px; }
+.primary { background: #195f48; }
+.primary:hover:not(:disabled) { background: #124b38; }
+.secondary, .icon-button { color: #234c3b; border-color: #b8cdbd; }
+.composer label { color: #244b3a; }
+.composer textarea { border: 1.5px solid #a9c0af; background: #fcfefc; }
+.send-button { border-radius: 12px; }
+.voice-toolbar { padding-top: 16px; border-top: 1px solid #e6eee8; }
+.reminder { border: 1px solid #dce8dd; box-shadow: 0 3px 12px rgba(31,66,45,.04); }
+.reminder-icon { border-radius: 12px; }
+.care-panel { padding: 30px; }
+.care-panel > .button-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.care-panel > .button-row button {
+  min-height: 70px; justify-content: flex-start; text-align: left;
+  padding: 16px; background: #f8fbf8; border-color: #d4e3d7;
+  font-size: 17px;
+}
+.care-panel > .button-row button svg { color: #267354; }
+.care-panel > .button-row button:hover:not(:disabled),
+.care-panel > .button-row button[aria-expanded="true"] { background: #e4f1e7; border-color: #438766; }
+.care-content { border-top: 1px solid #e2ece4; padding-top: 24px; }
+.sign-in {
+  max-width: 540px; margin: 7vh auto; padding: 36px;
+  background: #fff; border: 1px solid #dce9df; border-radius: 24px;
+  box-shadow: 0 18px 60px rgba(25, 70, 48, .09);
+}
+.sign-in > h1 { margin-top: 18px; color: #174b38; font-size: 30px; letter-spacing: -.03em; }
+.sign-in-intro { margin-top: 6px; color: #526b5b; }
+.sign-in h2 { margin-top: 30px; }
+.sign-in input { min-height: 52px; }
+.sign-in form > .primary { width: 100%; }
+@media (max-width: 1328px) { .welcome-band { margin-left: 24px; margin-right: 24px; } }
+@media (max-width: 760px) {
+  .welcome-band { margin: 14px 14px 0; padding: 24px; align-items: flex-start; flex-direction: column; }
+  .workspace { padding: 14px; }
+  .conversation-panel, .today-panel, .care-panel { padding: 20px; }
+  .care-panel > .button-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sign-in { margin: 20px 14px; padding: 24px; }
+}
+@media (max-width: 440px) {
+  .care-panel > .button-row { grid-template-columns: 1fr; }
+  .care-panel > .button-row button { min-height: 56px; }
+  .welcome-band h2 { font-size: 27px; }
+}
+
+/* A straightforward care dashboard, with emphasis on content and actions. */
+:root, body { background: #f8f7f2; color: #213b32; }
+.app-header { background: #fff; border-bottom: 1px solid #d8dfd7; }
+.brand-mark { border-radius: 8px; box-shadow: none; }
+.welcome-band {
+  margin-top: 30px; padding: 0 8px 22px; border-radius: 0;
+  background: transparent; color: #1c3e31; box-shadow: none;
+  border-bottom: 1px solid #cbd8cd;
+}
+.welcome-kicker { color: #4d6a58; letter-spacing: .06em; }
+.welcome-band h2 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 400; letter-spacing: -.02em; font-size: clamp(30px, 3vw, 39px);
+}
+.welcome-band > div > p:last-child { color: #415d4d; }
+.welcome-link { color: #185d43; border-color: #a9c2ae; border-radius: 6px; }
+.welcome-link:hover { background: #e7efe5; }
+.workspace { padding-top: 24px; }
+.conversation-panel, .today-panel, .care-panel, .caregiver-section, .pairing-result {
+  border-radius: 8px; box-shadow: none;
+}
+.conversation-panel { border-color: #d8e1d7; }
+.today-panel { background: #edf3ea; border-color: #d5e2d4; }
+.message--assistant { border-radius: 4px 12px 12px 12px; }
+.message--user { border-radius: 12px 4px 12px 12px; }
+.care-panel > .button-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 28px; }
+.care-panel > .button-row button {
+  min-height: 62px; border: 0; border-bottom: 1px solid #d9e4da; border-radius: 0;
+  background: transparent; padding: 14px 8px;
+}
+.care-panel > .button-row button:hover:not(:disabled),
+.care-panel > .button-row button[aria-expanded="true"] { background: #edf5ed; border-color: #9abc9f; }
+.care-panel > .button-row button[aria-expanded="true"] { box-shadow: inset 4px 0 #276e4e; }
+.sign-in { border-radius: 8px; box-shadow: 0 10px 30px rgba(25,70,48,.06); }
+@media (max-width: 760px) {
+  .welcome-band { margin: 20px 20px 0; padding: 0 0 20px; }
+}
+@media (max-width: 440px) { .care-panel > .button-row { grid-template-columns: 1fr; } }

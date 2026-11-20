@@ -16,6 +16,7 @@ import {
   Square,
   Volume2,
   LogOut,
+  HeartPulse,
 } from "lucide-react";
 import { createApi, errorMessage } from "./models/api.js";
 import { createDemoApi } from "./models/demo.js";
@@ -201,6 +202,7 @@ function Companion({ api, user, onSignOut }) {
       )}
       <header className="app-header">
         <div className="brand">
+          <span className="brand-mark"><HeartPulse size={25} aria-hidden="true" /></span>
           <div>
             <h1>Care Companion</h1>
             <p>Appointments &amp; reminders</p>
@@ -243,6 +245,14 @@ function Companion({ api, user, onSignOut }) {
           {accountError}
         </p>
       )}
+      <div className="welcome-band">
+        <div>
+          <p className="welcome-kicker">YOUR CARE COMPANION</p>
+          <h2>{user?.preferred_name ? `Hello, ${user.preferred_name}.` : "How can we help today?"}</h2>
+          <p>Ask a question, check your reminders, or manage your care.</p>
+        </div>
+        <a className="welcome-link" href="#care-tasks">Explore care tasks <span aria-hidden="true">↓</span></a>
+      </div>
       <main className="workspace">
         <section
           className="conversation-panel"

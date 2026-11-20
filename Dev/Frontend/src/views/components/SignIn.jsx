@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LogIn } from "lucide-react";
+import { HeartPulse, LogIn } from "lucide-react";
 import { errorMessage } from "../../models/api.js";
 
 export default function SignIn({ api, onSignIn, initialError }) {
@@ -41,7 +41,9 @@ export default function SignIn({ api, onSignIn, initialError }) {
   }
   return (
     <main className="sign-in">
+      <span className="brand-mark"><HeartPulse size={25} aria-hidden="true" /></span>
       <h1>Care Companion</h1>
+      <p className="sign-in-intro">A little help with the care that matters to you.</p>
       <h2>Sign in</h2>
       <div className="sign-in-tabs" role="group" aria-label="Sign-in method">
         <button

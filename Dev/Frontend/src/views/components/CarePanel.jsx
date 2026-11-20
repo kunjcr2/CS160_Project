@@ -64,11 +64,13 @@ export default function CarePanel({
 
   return (
     <section
+      id="care-tasks"
       ref={panelRef}
       tabIndex={-1}
       className="care-panel"
       aria-label="My care"
     >
+      <p className="eyebrow">YOUR CARE, ALL IN ONE PLACE</p>
       <h2>My care</h2>
       <p className="care-intro">Choose a task to see the details and next steps.</p>
       <div className="button-row">

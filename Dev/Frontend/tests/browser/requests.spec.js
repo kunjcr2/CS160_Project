@@ -100,6 +100,8 @@ test("exhausted refills lead to an editable doctor message without auto-sending"
 
 test("live unavailable services and unknown refill counts never fabricate requests or samples", async ({ page }) => {
   await liveSession(page);
+  await page.route("**/api/v1/older-adults/user-1/refills", (route) =>
+    route.fulfill({ status: 503, json: { detail: "Service unavailable" } }));
   const writes = [];
   page.on("request", (request) => { if (request.method() === "POST" && !request.url().includes("auth/")) writes.push(request.url()); });
   await page.goto(live);
