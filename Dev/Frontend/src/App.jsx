@@ -25,6 +25,7 @@ import { useNotifications } from "./controllers/useNotifications.js";
 import ConfirmationCard from "./views/components/ConfirmationCard.jsx";
 import ReminderBanner from "./views/components/ReminderBanner.jsx";
 import SignIn from "./views/components/SignIn.jsx";
+import CaregiverWorkspace from "./views/components/CaregiverWorkspace.jsx";
 import CarePanel from "./views/components/CarePanel.jsx";
 import { SupportWorkspace } from "./views/components/SupportQueue.jsx";
 import { useVoice, useSpeechPlayback } from "./controllers/useVoice.js";
@@ -86,6 +87,8 @@ export default function App() {
     );
   if (["support_agent", "admin"].includes(user?.role)) return <SupportWorkspace key={user.id}
     api={api} user={user} onSignOut={() => setUser(null)} />;
+  if (user?.role === "caregiver") return <CaregiverWorkspace key={user.id}
+    api={api} user={user} onSignOut={() => setUser(null)} />;
   return (
     <Companion
       key={user?.id || "demo"}
@@ -103,6 +106,7 @@ function Companion({ api, user, onSignOut }) {
   const [careTab, setCareTab] = useState("");
   const [careIntent, setCareIntent] = useState(null);
   const carePanel = useRef(null);
+  const remindersPanel = useRef(null);
   const [largeText, setLargeText] = useState(false);
   const [demoNotice, setDemoNotice] = useState("");
   const end = useRef(null);
@@ -412,8 +416,7 @@ function Companion({ api, user, onSignOut }) {
                 className="secondary"
                 disabled={occupied}
                 onClick={() => {
-                  setDraft("Show my reminders.");
-                  input.current?.focus();
+                  remindersPanel.current?.focus();
                 }}
               >
                 <Bell size={20} aria-hidden="true" />
@@ -518,7 +521,7 @@ function Companion({ api, user, onSignOut }) {
             </p>
           )}
         </section>
-        <aside className="today-panel" aria-labelledby="today-title">
+        <aside ref={remindersPanel} tabIndex={-1} className="today-panel" aria-labelledby="today-title">
           <div className="section-heading">
             <div>
               <p className="eyebrow">YOUR REMINDERS</p>
@@ -539,7 +542,11 @@ function Companion({ api, user, onSignOut }) {
             </button>
           </div>
           <p className="reminder-count">
-            {sent
+            {notifications.error
+              ? "Reminders could not be updated"
+              : notifications.loading && !notifications.reminders.length
+                ? "Checking your reminders..."
+                : sent
               ? `${sent} reminder${sent === 1 ? "" : "s"} waiting for you`
               : "No reminders waiting for a response"}
           </p>

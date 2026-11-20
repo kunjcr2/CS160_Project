@@ -3,28 +3,20 @@
 React/Vite care screens with authenticated API adapters, explicit confirmations,
 medication reminders, turn-based voice, care messages, refills and support requests.
 
-## Status (November 19, 2026)
+## Status (November 20, 2026)
 
-| Area | Implemented locally | Remaining acceptance work |
-| --- | --- | --- |
-| S2-15 / appointments | Conversation; provider/slot search; booking, cancellation and same-doctor rescheduling; confirmation and pending-action recovery | Integrated PostgreSQL acceptance |
-| S2-16 | Notification polling; appointment OK; medication Taken/Missed; medication schedules and daily doses; profile timezone and role checks | Medication feed/worker patch review and real worker tests |
-| S2-17 | Exact direct dependency versions, lockfile, setup README | Review and merge |
-| Sprint 3 voice | Microphone capture, transcription review, reply playback, opt-in automatic reading, cancellation and text fallback | Test with real microphone, actual STT/TTS, and integrated backend |
-| Auth integration | Pairing/email sign-in; single-flight refresh; cross-tab cookie lock; stale-session protection | Real PostgreSQL auth acceptance |
-| PB-07 care messages | Doctor selection, text draft, explicit review/confirm, sent/failed history against PR #34 | Acceptance against PR #34 with PostgreSQL; voice proposals remain deferred |
-| PB-06 Help and support queue | PR #38 Help proposals/confirmation; submitted receipt; agent/admin queue, claim/resolve, conflict handling and polling | Real API acceptance; older-adult Help history is not provided by this backend |
-| PB-04 refills | PR #38 proposals, confirmation and history; status polling; remaining-count refresh; doctor-message fallback | Real API and simulated-pharmacy acceptance |
-| AI suggestions | PR #31 intent routing to care forms and repeated-failure Help offer; explicit review before actions | Actual OpenAI recognition quality; care-message voice intent is not exposed yet |
+The current local checkout includes the merged appointment, reminder, messaging,
+refill, Help, and support APIs. Live mode supports caregiver registration and
+older-adult device pairing, then uses the FastAPI backend for care tasks. The
+caregiver workspace creates profiles and pairing codes; older adults use the care
+screen. A support agent has a separate queue. Explicit review and confirmation
+are required before booking, messaging, refills, or Help submission.
 
-The frontend now targets PR #38 (`44e9ae3`) for Help, queue, refills and appointment
-changes, PR #34 for messages, and merged PR #31 for AI suggestions. The inspected
-remote main is `14c055c`; PR #38 is still open. Run a backend containing those
-contracts, not the old backend in this primary local checkout. The sibling
-`integration/frontend-pr-apis` checkout is also an older snapshot and has not been
-updated by this frontend change. See [integration notes](PR_API_INTEGRATION.md).
-No remote PRs were merged and no existing databases were migrated. This is not a
-claim of real backend end-to-end acceptance or completion of the whole team sprint.
+Local acceptance exercised registration, pairing, booking, care records, AI
+conversation, text-to-speech, transcription, messages, refills, and Help through
+FastAPI and PostgreSQL. The healthcare provider, pharmacy, and doctor delivery
+remain mock adapters as specified in the project plan. Real microphone hardware
+and production hosting still need separate acceptance.
 
 ## Run Locally
 
@@ -49,20 +41,20 @@ Keep both manifests together when intentionally updating dependencies.
 ## Live Setup
 
 Follow the [backend README](../Backend/README.md) for the virtual environment,
-PostgreSQL, migrations and server setup. A backend integration checkout must
-include the relevant PRs below. Do not bypass authorization with a development
-user header to make frontend integration appear complete.
+PostgreSQL, migrations, and server setup. Do not bypass authorization with a
+development user header.
 
-Start FastAPI from Dev/Backend:
+Start FastAPI from Dev/Backend. On the Windows demo machine, use the startup
+script, which also starts its isolated PostgreSQL cluster and avoids a stale
+system OpenAI key overriding `.env`:
 
 ```powershell
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 5000
+powershell -ExecutionPolicy Bypass -File scripts/start_windows_demo.ps1
 ```
 
 Set `VITE_DATA_MODE=live` in `.env.local`, then restart Vite. Live mode first
-restores a session, or displays pairing-code/email sign-in. Existing caregiver
-accounts and pairing codes must be created through the backend. Account creation
-and caregiver pairing-code issuance are not included in this UI.
+restores a session, or displays pairing-code/email sign-in. A caregiver can create
+an account, add an older adult, and issue a one-time pairing code in the UI.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -222,11 +214,10 @@ response uses the same action ID; it never automatically creates a second messag
 Saved pending messages are restored after a page reload, including their full
 server read-back. New proposals stay blocked until the pending action is resolved.
 
-This first screen is for the signed-in older adult (plus explicit demo mode).
-Caregiver patient selection is not implemented; a caregiver ID is never substituted
-for older_adult_id. AI/voice care-message proposals remain deferred. To use the
-real API, run a backend containing PR #34 and its migration; the older local
-integration checkout does not contain #34 yet. A 404 does not fall back to samples.
+The care screen is for the signed-in older adult (plus explicit demo mode).
+Caregivers get a separate setup workspace; a caregiver ID is never substituted
+for older_adult_id. AI/voice care-message proposals remain deferred. A 404 in
+live mode does not fall back to samples.
 
 ## Help, support queue and prescription refills
 

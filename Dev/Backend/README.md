@@ -62,6 +62,28 @@ python -m scripts.seed
 
 Creates 3 mock doctors, Margaret (older adult), her son Daniel (caregiver, `daniel.lee@example.com`), and a support agent (`riley.chen@example.com`). The demo password is `DEMO_PASSWORD` in `scripts/seed.py`. Safe to run many times. Mock data only, never real patients.
 
+To sign in as Margaret through the frontend's pairing-code screen, generate a fresh
+one-time code after seeding:
+
+```bash
+python -m scripts.demo_pairing_code
+```
+
+The code expires after 15 minutes. Running the command again invalidates the
+previous unused code. This helper is for the seeded local demo only.
+
+On the Windows demo machine, `scripts/start_windows_demo.ps1` starts the isolated
+PostgreSQL cluster, applies migrations, and runs FastAPI on port 5000. It reads
+the OpenAI key from the ignored `.env` file even if an older Windows environment
+variable is still set. From `Dev/Backend`, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/start_windows_demo.ps1
+```
+
+The frontend uses the real API when `Dev/Frontend/.env.local` contains
+`VITE_DATA_MODE=live`. Start Vite from `Dev/Frontend` with `npm run dev`.
+
 The mock doctor's office can be made slow or broken for testing with `MOCK_PROVIDER_LATENCY_MS` and `MOCK_PROVIDER_FAILURE_RATE` in `.env` (see `.env.example`).
 
 ## 4. Run the server

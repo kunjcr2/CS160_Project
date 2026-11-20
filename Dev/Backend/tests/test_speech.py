@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from app.adapters.speech.client import OpenAISpeechToText, OpenAITextToSpeech
 from app.controllers.conversation import endpoints
 from app.main import app
+from app.views import messages
 
 
 class StaticSpeechToText:
@@ -66,6 +67,27 @@ def test_voice_pipeline_transcribes_and_speaks_readback(monkeypatch):
     assert result["audio_base64"] == "bXAzIGJ5dGVz"
     assert result["transcription_ms"] >= 0
     assert result["readback"] in speaker.spoken
+
+
+def test_voice_emergency_bypasses_model_and_speaks_guardrail(monkeypatch):
+    speaker = RecordingTextToSpeech()
+    recognizer = Mock()
+    recognizer.transcribe.return_value = "I have chest pain"
+    monkeypatch.setattr(endpoints, "get_speech_services", lambda: (recognizer, speaker))
+    model = Mock()
+    app.dependency_overrides[endpoints.get_language_model] = lambda: model
+    try:
+        response = TestClient(app).post(
+            "/api/v1/ai/voice",
+            files={"audio": ("request.webm", b"audio bytes", "audio/webm")},
+        )
+    finally:
+        app.dependency_overrides.pop(endpoints.get_language_model, None)
+    assert response.status_code == 200
+    assert response.json()["reply"] == messages.EMERGENCY_DETECTED
+    assert response.json()["proposal"] is None
+    assert speaker.spoken == messages.EMERGENCY_DETECTED
+    model.respond.assert_not_called()
 
 
 def test_voice_rejects_unsupported_audio():

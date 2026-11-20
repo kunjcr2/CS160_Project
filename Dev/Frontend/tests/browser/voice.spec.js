@@ -339,9 +339,7 @@ test("caregiver cannot press medication buttons", async ({ page }) => {
     }),
   );
   await page.goto(live);
-  await expect(
-    page.getByRole("article", { name: "Medication reminder", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Caregiver setup", exact: true })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Taken", exact: true }),
   ).toHaveCount(0);

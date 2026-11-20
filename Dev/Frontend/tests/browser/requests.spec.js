@@ -129,7 +129,7 @@ test("support-agent login uses a separate workspace without older-adult data req
 
 test("caregivers have no accidental self-refill or support queue access", async ({ page }) => {
   await liveSession(page, "caregiver"); await page.goto(live);
-  await expect(page.getByRole("heading", { name: "My care", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Caregiver setup", exact: true })).toBeVisible();
   for (const name of ["Help", "Prescription refills", "Preview support queue"])
     await expect(page.getByRole("button", { name, exact: true })).toHaveCount(0);
 });

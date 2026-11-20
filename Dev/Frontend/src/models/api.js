@@ -247,6 +247,28 @@ export function createApi({
       });
       return request("/api/v1/users/me");
     },
+    async registerCaregiver(values) {
+      await request("/api/v1/auth/register", { method: "POST", body: values });
+      await withAuthLock(async () => {
+        const result = await request("/api/v1/auth/login", {
+          method: "POST", body: { email: values.email, password: values.password },
+        });
+        acceptToken(result);
+        sessionVersion++;
+      });
+      return request("/api/v1/users/me");
+    },
+    async listOlderAdults(signal) {
+      return listResponse(await request("/api/v1/older-adults", { signal }));
+    },
+    async createOlderAdult(values) {
+      return request("/api/v1/older-adults", { method: "POST", body: values });
+    },
+    async createPairingCode(olderAdultId) {
+      return request("/api/v1/auth/pairing-codes", {
+        method: "POST", body: { older_adult_id: olderAdultId },
+      });
+    },
     async signOut() {
       await withAuthLock(async () => {
         await request("/api/v1/auth/logout", { method: "POST" });

@@ -133,3 +133,69 @@ test("unsupported session coordination reports an error without racing refresh r
   await expect(page.getByRole("alert")).toContainText("Secure sign-in is unavailable");
   expect(refreshes).toBe(0);
 });
+
+test("caregiver can register, create an older adult, and get a pairing code", async ({ page }) => {
+  await page.route("**/api/v1/auth/refresh", (route) =>
+    route.fulfill({ status: 401, json: { detail: "Not signed in." } }));
+  await page.route("**/api/v1/auth/register", (route) =>
+    route.fulfill({ status: 201, json: { id: "caregiver-1", role: "caregiver" } }));
+  await page.route("**/api/v1/auth/login", (route) =>
+    route.fulfill({ json: { access_token: "caregiver-token" } }));
+  await page.route("**/api/v1/users/me", (route) =>
+    route.fulfill({ json: { id: "caregiver-1", role: "caregiver", display_name: "Daniel" } }));
+  await page.route("**/api/v1/older-adults", (route) =>
+    route.request().method() === "GET"
+      ? route.fulfill({ json: [] })
+      : route.fulfill({ status: 201, json: {
+          older_adult: { id: "adult-1", role: "older_adult", display_name: "Margaret", preferred_name: "Maggie" },
+        } }));
+  await page.route("**/api/v1/auth/pairing-codes", (route) =>
+    route.fulfill({ status: 201, json: { code: "12345678", expires_at: "2026-12-01T12:00:00Z" } }));
+
+  await page.goto(live);
+  await page.getByRole("button", { name: "Create caregiver account" }).click();
+  await page.getByLabel("Your name").fill("Daniel");
+  await page.getByLabel("Email").fill("daniel@example.com");
+  await page.getByLabel("Password", { exact: true }).fill("long-test-password");
+  await page.getByLabel("Confirm password").fill("long-test-password");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByRole("heading", { name: "Caregiver setup" })).toBeVisible();
+  await page.getByLabel("Full name").fill("Margaret");
+  await page.getByRole("button", { name: "Create profile and pairing code" }).click();
+  await expect(page.getByText("12345678")).toBeVisible();
+  await expect(page.getByText("Margaret", { exact: true })).toBeVisible();
+});
+
+test("caregiver can recover from profile loading and pairing failures without duplicating a profile", async ({ page }) => {
+  let failReads = true;
+  let codes = 0;
+  let creates = 0;
+  await page.route("**/api/v1/auth/refresh", (route) => route.fulfill({ status: 401, json: { detail: "Not signed in." } }));
+  await page.route("**/api/v1/auth/login", (route) => route.fulfill({ json: { access_token: "caregiver-token" } }));
+  await page.route("**/api/v1/users/me", (route) => route.fulfill({ json: { id: "caregiver-1", role: "caregiver", display_name: "Daniel" } }));
+  await page.route("**/api/v1/older-adults", (route) => {
+    if (route.request().method() === "GET") {
+      return failReads ? route.fulfill({ status: 503, json: { detail: "Unavailable" } }) : route.fulfill({ json: [] });
+    }
+    creates++;
+    return route.fulfill({ status: 201, json: { older_adult: { id: "adult-1", role: "older_adult", display_name: "Margaret" } } });
+  });
+  await page.route("**/api/v1/auth/pairing-codes", (route) => {
+    codes++;
+    return codes === 1 ? route.fulfill({ status: 503, json: { detail: "Unavailable" } }) : route.fulfill({ status: 201, json: { code: "12345678", expires_at: "2026-12-01T12:00:00Z" } });
+  });
+  await page.goto(live);
+  await page.getByRole("button", { name: "Email", exact: true }).click();
+  await page.getByLabel("Email").fill("daniel@example.com");
+  await page.getByLabel("Password", { exact: true }).fill("long-test-password");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("Could not load profiles");
+  failReads = false;
+  await page.getByRole("button", { name: "Retry loading profiles" }).click();
+  await page.getByLabel("Full name").fill("Margaret");
+  await page.getByRole("button", { name: "Create profile and pairing code" }).click();
+  await expect(page.getByRole("alert")).toContainText("Profile created");
+  await page.getByRole("button", { name: "Create pairing code", exact: true }).click();
+  await expect(page.getByText("12345678")).toBeVisible();
+  expect(creates).toBe(1);
+});

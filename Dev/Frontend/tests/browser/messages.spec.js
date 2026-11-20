@@ -155,7 +155,7 @@ test("caregiver is not accidentally used as the older-adult id", async ({ page }
   await setup(page);
   await page.route("**/api/v1/users/me", (route) => route.fulfill({ json: { id: "caregiver-1", role: "caregiver", display_name: "Daniel", timezone: "America/Los_Angeles" } }));
   await page.goto(live);
-  await expect(page.getByRole("heading", { name: "My care", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Caregiver setup", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Message my doctor", exact: true })).toHaveCount(0);
 });
 

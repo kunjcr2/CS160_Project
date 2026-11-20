@@ -686,3 +686,92 @@ footer {
     flex-wrap: wrap;
   }
 }
+.caregiver-workspace {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 24px;
+  display: grid;
+  gap: 24px;
+}
+.caregiver-header, .caregiver-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.caregiver-section, .pairing-result {
+  padding: 24px;
+  border: 1px solid #dce5df;
+  border-radius: 8px;
+  background: #fff;
+  display: grid;
+  gap: 16px;
+}
+.caregiver-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.caregiver-list li {
+  border-top: 1px solid #dce5df;
+  padding-top: 12px;
+}
+.pairing-code {
+  font-size: clamp(32px, 9vw, 48px);
+  letter-spacing: .18em;
+  overflow-wrap: anywhere;
+}
+
+/* A calmer, more legible visual system across the care workspaces. */
+body {
+  background: #f3f7f4;
+}
+.app-header {
+  background: #fff;
+  border-bottom-color: #d9e7de;
+  box-shadow: 0 3px 18px rgba(31, 72, 50, .05);
+}
+.brand h1 {
+  color: #194f39;
+  letter-spacing: -.03em;
+}
+.brand p { margin-top: 2px; }
+button {
+  border-radius: 10px;
+  transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.primary { box-shadow: 0 3px 8px rgba(30, 89, 59, .16); }
+.workspace { gap: 20px; padding: 24px; align-items: start; }
+.conversation-panel, .today-panel {
+  padding: 28px;
+  border: 1px solid #dce8df;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 8px 28px rgba(34, 73, 50, .06);
+}
+.today-panel { background: #edf5ef; }
+.eyebrow { letter-spacing: .09em; color: #47745a; }
+.messages { padding: 16px 10px 24px 0; }
+.message--assistant {
+  padding: 18px 20px;
+  border-radius: 4px 18px 18px 18px;
+  background: #f2f7f3;
+}
+.message--user { border-radius: 18px 4px 18px 18px; background: #dceee2; }
+.reminder, .care-list li { border-radius: 14px; }
+.care-panel, .caregiver-section, .pairing-result {
+  border-color: #dce8df;
+  border-radius: 20px;
+  box-shadow: 0 8px 28px rgba(34, 73, 50, .06);
+}
+.care-panel .care-intro { color: #526b5b; margin: -6px 0 16px; }
+.care-panel > .button-row button { white-space: normal; }
+textarea, .care-form input, .care-form select, .sign-in input { border-radius: 10px; }
+@media (max-width: 760px) {
+  .workspace { gap: 14px; padding: 14px; }
+  .conversation-panel, .today-panel { padding: 20px; }
+}
+@media (prefers-reduced-motion: reduce) { button { transition: none; } }

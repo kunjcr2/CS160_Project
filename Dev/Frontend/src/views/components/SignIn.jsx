@@ -10,16 +10,31 @@ export default function SignIn({ api, onSignIn, initialError }) {
     event.preventDefault();
     if (busy) return;
     const data = new FormData(event.currentTarget);
+    if (method === "register" && data.get("password") !== data.get("confirmPassword")) {
+      setError("Passwords do not match.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
-      const values =
-        method === "pair"
-          ? { code: data.get("code").trim() }
-          : { email: data.get("email").trim(), password: data.get("password") };
-      onSignIn(await api.signIn(method, values));
+      const values = method === "pair"
+        ? { code: data.get("code").trim() }
+        : { email: data.get("email").trim(), password: data.get("password") };
+      onSignIn(await (method === "register"
+        ? api.registerCaregiver({ ...values, display_name: data.get("displayName").trim() })
+        : api.signIn(method, values)));
     } catch (error) {
-      setError(errorMessage(error));
+      if (method === "register" && error.status === 409) {
+        setError("This email already has an account. Sign in instead.");
+      } else if (error.status === 401) {
+        setError(
+          method === "pair"
+            ? "That pairing code is invalid or expired. Ask your caregiver for a new code."
+            : "The email or password is incorrect.",
+        );
+      } else {
+        setError(errorMessage(error));
+      }
     } finally {
       setBusy(false);
     }
@@ -51,6 +66,17 @@ export default function SignIn({ api, onSignIn, initialError }) {
         >
           Email
         </button>
+        <button
+          className="secondary"
+          aria-pressed={method === "register"}
+          disabled={busy}
+          onClick={() => {
+            setMethod("register");
+            setError("");
+          }}
+        >
+          Create caregiver account
+        </button>
       </div>
       <form onSubmit={submit} key={method}>
         {method === "pair" ? (
@@ -69,6 +95,12 @@ export default function SignIn({ api, onSignIn, initialError }) {
           </label>
         ) : (
           <>
+            {method === "register" && (
+              <label>
+                Your name
+                <input name="displayName" autoComplete="name" required maxLength={120} disabled={busy} />
+              </label>
+            )}
             <label>
               Email
               <input
@@ -86,9 +118,17 @@ export default function SignIn({ api, onSignIn, initialError }) {
                 type="password"
                 autoComplete="current-password"
                 required
+                minLength={method === "register" ? 12 : undefined}
                 disabled={busy}
               />
             </label>
+            {method === "register" && (
+              <label>
+                Confirm password
+                <input name="confirmPassword" type="password" autoComplete="new-password"
+                  required minLength={12} disabled={busy} />
+              </label>
+            )}
           </>
         )}
         {(error || initialError) && (
@@ -98,7 +138,7 @@ export default function SignIn({ api, onSignIn, initialError }) {
         )}
         <button className="primary" disabled={busy}>
           <LogIn size={20} aria-hidden="true" />
-          {busy ? "Signing in..." : "Sign in"}
+          {busy ? "Please wait..." : method === "register" ? "Create account" : "Sign in"}
         </button>
       </form>
     </main>

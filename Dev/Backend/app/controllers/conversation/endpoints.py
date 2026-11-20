@@ -41,7 +41,7 @@ class VoiceResponse(ProcessResponse):
     transcription_ms: int
 
 
-def get_language_model() -> LanguageModel:
+def get_language_model() -> LanguageModel | None:
     try:
         return build_language_model(
             fake_ai=settings.fake_ai,
@@ -50,18 +50,21 @@ def get_language_model() -> LanguageModel:
             reasoning_effort=settings.openai_reasoning_effort,
             max_output_tokens=settings.openai_max_output_tokens,
         )
-    except ValueError as error:
-        raise HTTPException(status_code=503, detail=messages.AI_UNAVAILABLE) from error
+    except ValueError:
+        return None
 
 
 @router.post("/process", response_model=ProcessResponse)
 def process_text(
-    request: ProcessRequest, language_model: Annotated[LanguageModel, Depends(get_language_model)]
+    request: ProcessRequest,
+    language_model: Annotated[LanguageModel | None, Depends(get_language_model)],
 ) -> ProcessResponse:
     """Interpret text into a proposal. This endpoint never creates or confirms an action."""
     emergency_reply = check_emergency(request.text)
     if emergency_reply is not None:
         return ProcessResponse(reply=emergency_reply, proposal=None)
+    if language_model is None:
+        raise HTTPException(status_code=503, detail=messages.AI_UNAVAILABLE)
     try:
         result = ConversationOrchestrator(language_model).process(
             request.text, request.language, request.unclear_turns
@@ -74,7 +77,7 @@ def process_text(
 @router.post("/voice", response_model=VoiceResponse)
 async def process_voice(
     audio: Annotated[UploadFile, File()],
-    language_model: Annotated[LanguageModel, Depends(get_language_model)],
+    language_model: Annotated[LanguageModel | None, Depends(get_language_model)],
     language: Annotated[str, Form()] = "en",
     unclear_turns: Annotated[int, Form(ge=0, le=3)] = 0,
 ) -> VoiceResponse:
@@ -102,23 +105,30 @@ async def process_voice(
     except (OpenAIError, ValueError) as error:
         raise HTTPException(status_code=503, detail="Speech transcription failed") from error
     elapsed_ms = round((perf_counter() - started) * 1000)
-    try:
-        result = await run_in_threadpool(
-            ConversationOrchestrator(language_model).process,
-            transcript,
-            normalized_language,
-            unclear_turns,
-        )
-    except OpenAIError as error:
-        raise HTTPException(status_code=503, detail=messages.AI_UNAVAILABLE) from error
-    spoken = f"{result.reply} {result.readback}" if result.readback else result.reply
+    emergency_reply = check_emergency(transcript)
+    if emergency_reply is not None:
+        response = ProcessResponse(reply=emergency_reply, language=normalized_language)
+    else:
+        if language_model is None:
+            raise HTTPException(status_code=503, detail=messages.AI_UNAVAILABLE)
+        try:
+            result = await run_in_threadpool(
+                ConversationOrchestrator(language_model).process,
+                transcript,
+                normalized_language,
+                unclear_turns,
+            )
+        except OpenAIError as error:
+            raise HTTPException(status_code=503, detail=messages.AI_UNAVAILABLE) from error
+        response = ProcessResponse(**result.__dict__)
+    spoken = f"{response.reply} {response.readback}" if response.readback else response.reply
     try:
         audio_bytes = await run_in_threadpool(text_to_speech.synthesize, spoken)
         audio_base64 = base64.b64encode(audio_bytes).decode("ascii")
     except (OpenAIError, ValueError):
         audio_base64 = None  # The text response remains usable when speech fails.
     return VoiceResponse(
-        **result.__dict__,
+        **response.model_dump(),
         transcript=transcript,
         audio_base64=audio_base64,
         transcription_ms=elapsed_ms,

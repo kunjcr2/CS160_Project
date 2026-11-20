@@ -147,3 +147,16 @@ def test_process_endpoint_returns_the_emergency_message_without_calling_the_ai()
     body = response.json()
     assert body["reply"] == messages.EMERGENCY_DETECTED
     assert body["proposal"] is None
+
+
+def test_emergency_response_is_available_when_language_model_is_unconfigured() -> None:
+    app.dependency_overrides[get_language_model] = lambda: None
+    try:
+        client = TestClient(app)
+        emergency = client.post("/api/v1/ai/process", json={"text": "I have chest pain"})
+        ordinary = client.post("/api/v1/ai/process", json={"text": "Book an appointment"})
+    finally:
+        app.dependency_overrides.pop(get_language_model, None)
+    assert emergency.status_code == 200
+    assert emergency.json()["reply"] == messages.EMERGENCY_DETECTED
+    assert ordinary.status_code == 503

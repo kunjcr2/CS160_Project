@@ -72,6 +72,18 @@ def test_create_older_adult_gives_caregiver_a_grant(client, carer):
     assert set(body["grant"]["scopes"]) == {"appointments:read", "profile:manage"}
 
 
+def test_caregiver_lists_only_their_managed_profiles(client, carer, margaret_id):
+    stranger = sign_up(client, "stranger@example.com")
+    stranger_adult = client.post(
+        "/api/v1/older-adults", headers=stranger, json={"display_name": "Other Adult"}
+    ).json()["older_adult"]["id"]
+    response = client.get("/api/v1/older-adults", headers=carer)
+    assert response.status_code == 200
+    assert [adult["id"] for adult in response.json()] == [margaret_id]
+    assert stranger_adult not in [adult["id"] for adult in response.json()]
+    assert client.get("/api/v1/older-adults").status_code == 401
+
+
 def test_create_with_unknown_scope_returns_422(client, carer):
     response = client.post(
         "/api/v1/older-adults",

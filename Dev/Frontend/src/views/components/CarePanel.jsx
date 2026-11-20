@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { CalendarDays, Pill, MessageCircle, RefreshCw, LifeBuoy, Users } from "lucide-react";
 import { errorMessage } from "../../models/api.js";
 import { localDate } from "../../models/dates.js";
 import ReminderBanner from "./ReminderBanner.jsx";
@@ -69,13 +70,14 @@ export default function CarePanel({
       aria-label="My care"
     >
       <h2>My care</h2>
+      <p className="care-intro">Choose a task to see the details and next steps.</p>
       <div className="button-row">
         <button
           className="secondary"
           aria-expanded={tab === "appointments"}
           onClick={() => setTab(tab === "appointments" ? "" : "appointments")}
         >
-          Find appointments
+          <CalendarDays size={20} aria-hidden="true" /> Find appointments
         </button>
         {(!user || user.role === "older_adult") && (
           <button
@@ -83,19 +85,19 @@ export default function CarePanel({
             aria-expanded={tab === "medications"}
             onClick={() => setTab(tab === "medications" ? "" : "medications")}
           >
-            My medications
+            <Pill size={20} aria-hidden="true" /> My medications
           </button>
         )}
         {canMessage && <button className="secondary" aria-expanded={tab === "messages"}
-          onClick={() => setTab(tab === "messages" ? "" : "messages")}>Message my doctor</button>}
+          onClick={() => setTab(tab === "messages" ? "" : "messages")}><MessageCircle size={20} aria-hidden="true" /> Message my doctor</button>}
         {canMessage && <>
           <button className="secondary" aria-expanded={tab === "refills"}
-            onClick={() => setTab(tab === "refills" ? "" : "refills")}>Prescription refills</button>
+            onClick={() => setTab(tab === "refills" ? "" : "refills")}><RefreshCw size={20} aria-hidden="true" /> Prescription refills</button>
           <button className="secondary" aria-expanded={tab === "help"}
-            onClick={() => { setHelpReason("user_request"); setTab(tab === "help" ? "" : "help"); }}>Help</button>
+            onClick={() => { setHelpReason("user_request"); setTab(tab === "help" ? "" : "help"); }}><LifeBuoy size={20} aria-hidden="true" /> Help</button>
         </>}
         {api.mode === "demo" && <button className="secondary" aria-expanded={tab === "support"}
-          onClick={() => setTab(tab === "support" ? "" : "support")}>Preview support queue</button>}
+          onClick={() => setTab(tab === "support" ? "" : "support")}><Users size={20} aria-hidden="true" /> Preview support queue</button>}
       </div>
       {tab === "appointments" && (
         <Appointments
