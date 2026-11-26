@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 from unittest.mock import Mock
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.adapters.speech.client import OpenAISpeechToText, OpenAITextToSpeech
@@ -33,6 +34,28 @@ def test_fake_transcription_accepts_uploaded_audio():
 
     assert response.status_code == 200
     assert response.json() == {"text": "This is a fake transcription."}
+
+
+@pytest.mark.parametrize(
+    "content_type", ["audio/webm;codecs=opus", "audio/webm; codecs=opus", "Audio/MP4"]
+)
+def test_transcription_accepts_browser_types_with_codec_details(content_type):
+    """Chrome's MediaRecorder sends "audio/webm;codecs=opus", not plain "audio/webm"."""
+    response = TestClient(app).post(
+        "/api/v1/ai/transcribe",
+        files={"audio": ("request.webm", b"audio bytes", content_type)},
+    )
+
+    assert response.status_code == 200
+
+
+def test_transcription_still_rejects_unsupported_types():
+    response = TestClient(app).post(
+        "/api/v1/ai/transcribe",
+        files={"audio": ("notes.txt", b"not audio", "text/plain")},
+    )
+
+    assert response.status_code == 415
 
 
 def test_fake_tts_returns_audio_bytes():
@@ -117,3 +140,15 @@ def test_openai_tts_uses_configured_voice_and_mp3():
     request = speaker._client.audio.speech.create.call_args.kwargs
     assert request["voice"] == "nova"
     assert request["response_format"] == "mp3"
+
+
+def test_voice_pipeline_accepts_browser_type_with_codec_details(monkeypatch):
+    speaker = RecordingTextToSpeech()
+    monkeypatch.setattr(endpoints, "get_speech_services", lambda: (StaticSpeechToText(), speaker))
+    response = TestClient(app).post(
+        "/api/v1/ai/voice",
+        data={"language": "es"},
+        files={"audio": ("request.webm", b"audio bytes", "audio/webm;codecs=opus")},
+    )
+    assert response.status_code == 200
+    assert response.json()["transcript"] == "Quiero una cita con Dra. Ruiz mañana"
