@@ -13,7 +13,12 @@ from app.adapters.llm.client import LanguageModel, build_language_model
 from app.config import settings
 from app.controllers.conversation.orchestrator import ConversationOrchestrator
 from app.controllers.conversation.tools import Proposal
-from app.controllers.speech import MAX_AUDIO_BYTES, SUPPORTED_AUDIO_TYPES, get_speech_services
+from app.controllers.speech import (
+    MAX_AUDIO_BYTES,
+    SUPPORTED_AUDIO_TYPES,
+    audio_media_type,
+    get_speech_services,
+)
 from app.model.guardrail import check_emergency
 from app.views import messages
 
@@ -82,7 +87,8 @@ async def process_voice(
     unclear_turns: Annotated[int, Form(ge=0, le=3)] = 0,
 ) -> VoiceResponse:
     """Transcribe, interpret, and speak the response; never execute the proposal."""
-    if audio.content_type not in SUPPORTED_AUDIO_TYPES:
+    media_type = audio_media_type(audio.content_type)
+    if media_type not in SUPPORTED_AUDIO_TYPES:
         raise HTTPException(status_code=415, detail="Unsupported audio format")
     contents = await audio.read(MAX_AUDIO_BYTES + 1)
     if len(contents) > MAX_AUDIO_BYTES:
@@ -99,7 +105,7 @@ async def process_voice(
             speech_to_text.transcribe,
             contents,
             audio.filename or "audio.webm",
-            audio.content_type,
+            media_type,
             normalized_language,
         )
     except (OpenAIError, ValueError) as error:

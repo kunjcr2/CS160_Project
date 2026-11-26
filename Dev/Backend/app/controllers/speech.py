@@ -36,6 +36,12 @@ class TranscriptionResponse(BaseModel):
     text: str
 
 
+def audio_media_type(content_type: str | None) -> str:
+    """The audio type without parameters. Browsers record as "audio/webm;codecs=opus";
+    only the "audio/webm" part decides whether the format is supported."""
+    return (content_type or "").split(";")[0].strip().lower()
+
+
 def get_speech_services() -> tuple[SpeechToText, TextToSpeech]:
     try:
         return build_speech_services(
@@ -53,7 +59,8 @@ def get_speech_services() -> tuple[SpeechToText, TextToSpeech]:
 async def transcribe_audio(
     audio: Annotated[UploadFile, File()],
 ) -> TranscriptionResponse:
-    if audio.content_type not in SUPPORTED_AUDIO_TYPES:
+    media_type = audio_media_type(audio.content_type)
+    if media_type not in SUPPORTED_AUDIO_TYPES:
         raise HTTPException(status_code=415, detail="Unsupported audio format")
     speech_to_text, _ = get_speech_services()
     try:
@@ -64,7 +71,7 @@ async def transcribe_audio(
             speech_to_text.transcribe,
             contents,
             audio.filename or "audio.webm",
-            audio.content_type,
+            media_type,
         )
     except (OpenAIError, ValueError) as error:
         raise HTTPException(status_code=503, detail="Speech transcription failed") from error
